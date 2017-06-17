@@ -1,6 +1,5 @@
 # ovirt_exporter
 [![Build Status](https://travis-ci.org/czerwonk/ovirt_exporter.svg)][travis]
-[![Go Report Card](https://goreportcard.com/badge/github.com/czerwonk/ovirt_exporter)][goreportcard]
 
 Exporter for oVirt engine metrics to use with https://prometheus.io/
 
