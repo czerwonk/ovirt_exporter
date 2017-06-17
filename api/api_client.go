@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// ApiClient encapsulates communication with the oVirt REST API
 type ApiClient struct {
 	Url      string
 	Username string
@@ -16,6 +17,7 @@ type ApiClient struct {
 	client   *http.Client
 }
 
+// NewClient returns a new client
 func NewClient(url, username, password string, insecureCert bool) *ApiClient {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureCert},
@@ -25,6 +27,7 @@ func NewClient(url, username, password string, insecureCert bool) *ApiClient {
 	return &ApiClient{Url: url, Username: username, Password: password, client: c}
 }
 
+// GetAndParse retrieves XML data from the API and unmarshals it
 func (c *ApiClient) GetAndParse(path string, v interface{}) error {
 	b, err := c.Get(path)
 
@@ -36,6 +39,7 @@ func (c *ApiClient) GetAndParse(path string, v interface{}) error {
 	return err
 }
 
+// Get retrieves XML data from the API and returns it
 func (c *ApiClient) Get(path string) ([]byte, error) {
 	req, err := http.NewRequest("GET", strings.Trim(c.Url, "/")+strings.Trim(path, "/"), nil)
 
@@ -54,6 +58,7 @@ func (c *ApiClient) Get(path string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
+// StatiscticsPath builds an statistics path for a given ressource
 func StatiscticsPath(ressourceType string, id string) string {
 	return fmt.Sprintf("/%s/%s/statistics", ressourceType, id)
 }
