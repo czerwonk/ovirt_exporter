@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/prometheus/common/log"
 )
 
 // ApiClient encapsulates communication with the oVirt REST API
@@ -41,7 +43,9 @@ func (c *ApiClient) GetAndParse(path string, v interface{}) error {
 
 // Get retrieves XML data from the API and returns it
 func (c *ApiClient) Get(path string) ([]byte, error) {
-	req, err := http.NewRequest("GET", strings.Trim(c.Url, "/")+strings.Trim(path, "/"), nil)
+	uri := strings.Trim(c.Url, "/") + "/" + strings.Trim(path, "/")
+	log.Debug("GET ", uri)
+	req, err := http.NewRequest("GET", uri, nil)
 
 	if err != nil {
 		return nil, err
