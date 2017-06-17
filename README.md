@@ -26,5 +26,8 @@ This software uses components of the following projects
 ## Prometheus
 see https://prometheus.io/
 
+## oVirt
+see https://www.ovirt.org/
+
 [travis]: https://travis-ci.org/czerwonk/ovirt_exporter
 [goreportcard]: https://goreportcard.com/report/github.com/czerwonk/ovirt_exporter
