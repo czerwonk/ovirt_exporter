@@ -12,6 +12,10 @@ this is an early version
 go get -u github.com/czerwonk/ovirt_exporter
 ```
 
+## Supported ressources
+* hosts
+* vms
+
 ## Third Party Components
 This software uses components of the following projects
 * Prometheus Go client library (https://github.com/prometheus/client_golang)
