@@ -1,5 +1,6 @@
 # ovirt_exporter
 [![Build Status](https://travis-ci.org/czerwonk/ovirt_exporter.svg)][travis]
+[![Docker Build Statu](https://img.shields.io/docker/build/czerwonk/ovirt_exporter.svg)][dockerbuild]
 [![Go Report Card](https://goreportcard.com/badge/github.com/czerwonk/ovirt_exporter)][goreportcard]
 
 Exporter for oVirt engine metrics to use with https://prometheus.io/
@@ -30,4 +31,5 @@ see https://prometheus.io/
 see https://www.ovirt.org/
 
 [travis]: https://travis-ci.org/czerwonk/ovirt_exporter
+[dockerbuild]: https://hub.docker.com/r/czerwonk/ovirt_exporter/builds
 [goreportcard]: https://goreportcard.com/report/github.com/czerwonk/ovirt_exporter
