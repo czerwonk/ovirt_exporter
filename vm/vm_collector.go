@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/czerwonk/ovirt_exporter/api"
+	"github.com/czerwonk/ovirt_exporter/cluster"
+	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/statistic"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -11,16 +13,20 @@ import (
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	api       *api.ApiClient
-	metrics   []prometheus.Metric
-	mutex     sync.Mutex
-	retriever *statistic.StatisticMetricRetriever
+	api              *api.ApiClient
+	metrics          []prometheus.Metric
+	mutex            sync.Mutex
+	retriever        *statistic.StatisticMetricRetriever
+	hostRetriever    *host.HostRetriever
+	clusterRetriever *cluster.ClusterRetriever
 }
 
 // NewCollector creates a new collector
-func NewCollector(c *api.ApiClient) prometheus.Collector {
-	r := statistic.NewStatisticMetricRetriever("vm", c)
-	return &VmCollector{api: c, retriever: r}
+func NewCollector(api *api.ApiClient) prometheus.Collector {
+	r := statistic.NewStatisticMetricRetriever("vm", api, []string{"host", "cluster"})
+	h := host.NewRetriever(api)
+	c := cluster.NewRetriever(api)
+	return &VmCollector{api: api, retriever: r, hostRetriever: h, clusterRetriever: c}
 }
 
 // Collect implements Prometheus Collector interface
@@ -51,11 +57,33 @@ func (c *VmCollector) getMetrics() []prometheus.Metric {
 
 func (c *VmCollector) retrieveMetrics() {
 	ressources := make(map[string]string)
+	labelValues := make(map[string][]string)
+
 	for _, vm := range c.getVms() {
 		ressources[vm.Id] = vm.Name
+		labelValues[vm.Id] = c.getLabelValues(&vm)
 	}
 
-	c.metrics = c.retriever.RetrieveMetrics(ressources)
+	c.metrics = c.retriever.RetrieveMetrics(ressources, labelValues)
+}
+
+func (c *VmCollector) getLabelValues(vm *Vm) []string {
+	h := &host.Host{}
+	var err error
+
+	if len(vm.Host.Id) > 0 {
+		h, err = c.hostRetriever.Get(vm.Host.Id)
+		if err != nil {
+			log.Error(err)
+		}
+	}
+
+	cl, err := c.clusterRetriever.Get(vm.Cluster.Id)
+	if err != nil {
+		log.Error(err)
+	}
+
+	return []string{h.Name, cl.Name}
 }
 
 func (c *VmCollector) getVms() []Vm {

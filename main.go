@@ -8,13 +8,14 @@ import (
 
 	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/host"
+	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.1.0"
+const version string = "0.2.0"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -78,6 +79,7 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(vm.NewCollector(client))
 	reg.MustRegister(host.NewCollector(client))
+	reg.MustRegister(storagedomain.NewCollector(client))
 
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),

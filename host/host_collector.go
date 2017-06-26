@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/czerwonk/ovirt_exporter/api"
+	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/statistic"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -11,16 +12,19 @@ import (
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	api       *api.ApiClient
-	metrics   []prometheus.Metric
-	mutex     sync.Mutex
-	retriever *statistic.StatisticMetricRetriever
+	api              *api.ApiClient
+	metrics          []prometheus.Metric
+	mutex            sync.Mutex
+	retriever        *statistic.StatisticMetricRetriever
+	clusterRetriever *cluster.ClusterRetriever
 }
 
 // NewCollector creates a new collector
-func NewCollector(c *api.ApiClient) prometheus.Collector {
-	r := statistic.NewStatisticMetricRetriever("host", c)
-	return &HostCollector{api: c, retriever: r}
+func NewCollector(api *api.ApiClient) prometheus.Collector {
+	l := []string{"cluster"}
+	r := statistic.NewStatisticMetricRetriever("host", api, l)
+	c := cluster.NewRetriever(api)
+	return &HostCollector{api: api, retriever: r, clusterRetriever: c}
 }
 
 // Collect implements Prometheus Collector interface
@@ -51,11 +55,19 @@ func (c *HostCollector) getMetrics() []prometheus.Metric {
 
 func (c *HostCollector) retrieveMetrics() {
 	ressources := make(map[string]string)
+	labelValues := make(map[string][]string)
+
 	for _, h := range c.getHosts() {
+		cluster, err := c.clusterRetriever.Get(h.Cluster.Id)
+		if err != nil {
+			log.Error(err)
+		}
+
 		ressources[h.Id] = h.Name
+		labelValues[h.Id] = []string{cluster.Name}
 	}
 
-	c.metrics = c.retriever.RetrieveMetrics(ressources)
+	c.metrics = c.retriever.RetrieveMetrics(ressources, labelValues)
 }
 
 func (c *HostCollector) getHosts() []Host {

@@ -28,15 +28,16 @@ type Statistic struct {
 }
 
 type StatisticMetricRetriever struct {
-	ressource string
-	api       *api.ApiClient
+	ressource  string
+	api        *api.ApiClient
+	labelNames []string
 }
 
-func NewStatisticMetricRetriever(ressource string, api *api.ApiClient) *StatisticMetricRetriever {
-	return &StatisticMetricRetriever{ressource: ressource, api: api}
+func NewStatisticMetricRetriever(ressource string, api *api.ApiClient, labelNames []string) *StatisticMetricRetriever {
+	return &StatisticMetricRetriever{ressource: ressource, api: api, labelNames: labelNames}
 }
 
-func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string) []prometheus.Metric {
+func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string, labelValues map[string][]string) []prometheus.Metric {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(ressources))
 
@@ -44,7 +45,7 @@ func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string)
 	done := make(chan bool)
 
 	for id, name := range ressources {
-		go m.retrieveMetricsForId(id, name, ch, wg)
+		go m.retrieveMetricsForId(id, name, ch, wg, labelValues)
 	}
 
 	go func() {
@@ -64,7 +65,8 @@ func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string)
 	}
 }
 
-func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, name string, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, name string, ch chan<- prometheus.Metric,
+	wg *sync.WaitGroup, labelValues map[string][]string) {
 	defer wg.Done()
 
 	p := api.StatiscticsPath(m.ressource+"s", id)
@@ -78,12 +80,13 @@ func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, name string, 
 
 	for _, s := range stats.Statistic {
 		if s.Kind == "gauge" {
-			ch <- m.convertToMetric(id, name, &s)
+			ch <- m.convertToMetric(id, name, &s, labelValues)
 		}
 	}
 }
 
-func (m *StatisticMetricRetriever) convertToMetric(id string, name string, s *Statistic) prometheus.Metric {
+func (m *StatisticMetricRetriever) convertToMetric(id string, name string, s *Statistic,
+	labelValues map[string][]string) prometheus.Metric {
 	metricName := strings.Replace(s.Name, ".", "_", -1)
 
 	if s.Unit != "none" {
@@ -92,10 +95,11 @@ func (m *StatisticMetricRetriever) convertToMetric(id string, name string, s *St
 
 	n := prometheus.BuildFQName("ovirt", m.ressource, metricName)
 
-	labelNames := []string{"name"}
+	labelNames := append([]string{"name"}, m.labelNames...)
 	d := prometheus.NewDesc(n, s.Description, labelNames, nil)
 
-	r, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s.Values.Value.Datum, name)
+	lv := append([]string{name}, labelValues[id]...)
+	r, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s.Values.Value.Datum, lv...)
 
 	if err != nil {
 		log.Errorln(err)

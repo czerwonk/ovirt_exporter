@@ -7,4 +7,10 @@ type Vms struct {
 type Vm struct {
 	Id   string `xml:"id,attr"`
 	Name string `xml:"name"`
+	Host struct {
+		Id string `xml:"id,attr"`
+	} `xml:"host,omitempty"`
+	Cluster struct {
+		Id string `xml:"id,attr"`
+	} `xml:"cluster,omitempty"`
 }

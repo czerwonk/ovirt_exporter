@@ -5,6 +5,9 @@ type Hosts struct {
 }
 
 type Host struct {
-	Id   string `xml:"id,attr"`
-	Name string `xml:"name"`
+	Id      string `xml:"id,attr"`
+	Name    string `xml:"name"`
+	Cluster struct {
+		Id string `xml:"id,attr"`
+	} `xml:"cluster"`
 }
