@@ -13,4 +13,5 @@ type Vm struct {
 	Cluster struct {
 		Id string `xml:"id,attr"`
 	} `xml:"cluster,omitempty"`
+	Status string `xml:"status"`
 }

@@ -11,6 +11,18 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+const prefix = "ovirt_vm_"
+
+var (
+	upDesc     *prometheus.Desc
+	labelNames []string
+)
+
+func init() {
+	labelNames = []string{"name", "host", "cluster"}
+	upDesc = prometheus.NewDesc(prefix+"up", "VM is running (1) or not (0)", labelNames, nil)
+}
+
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
 	api              *api.ApiClient
@@ -23,7 +35,7 @@ type VmCollector struct {
 
 // NewCollector creates a new collector
 func NewCollector(api *api.ApiClient) prometheus.Collector {
-	r := statistic.NewStatisticMetricRetriever("vm", api, []string{"host", "cluster"})
+	r := statistic.NewStatisticMetricRetriever("vm", api, labelNames)
 	h := host.NewRetriever(api)
 	c := cluster.NewRetriever(api)
 	return &VmCollector{api: api, retriever: r, hostRetriever: h, clusterRetriever: c}
@@ -56,15 +68,27 @@ func (c *VmCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *VmCollector) retrieveMetrics() {
-	ressources := make(map[string]string)
+	ids := make([]string, 0)
 	labelValues := make(map[string][]string)
 
+	c.metrics = make([]prometheus.Metric, 0)
 	for _, vm := range c.getVms() {
-		ressources[vm.Id] = vm.Name
+		ids = append(ids, vm.Id)
 		labelValues[vm.Id] = c.getLabelValues(&vm)
+
+		c.metrics = append(c.metrics, c.upMetric(&vm, labelValues[vm.Id]))
 	}
 
-	c.metrics = c.retriever.RetrieveMetrics(ressources, labelValues)
+	c.metrics = append(c.metrics, c.retriever.RetrieveMetrics(ids, labelValues)...)
+}
+
+func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {
+	var up float64
+	if vm.Status == "up" {
+		up = 1
+	}
+
+	return prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, up, labelValues...)
 }
 
 func (c *VmCollector) getLabelValues(vm *Vm) []string {
@@ -83,7 +107,7 @@ func (c *VmCollector) getLabelValues(vm *Vm) []string {
 		log.Error(err)
 	}
 
-	return []string{h.Name, cl.Name}
+	return []string{vm.Name, h.Name, cl.Name}
 }
 
 func (c *VmCollector) getVms() []Vm {

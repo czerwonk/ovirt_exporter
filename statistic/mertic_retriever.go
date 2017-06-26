@@ -37,15 +37,15 @@ func NewStatisticMetricRetriever(ressource string, api *api.ApiClient, labelName
 	return &StatisticMetricRetriever{ressource: ressource, api: api, labelNames: labelNames}
 }
 
-func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string, labelValues map[string][]string) []prometheus.Metric {
+func (m *StatisticMetricRetriever) RetrieveMetrics(ids []string, labelValues map[string][]string) []prometheus.Metric {
 	wg := &sync.WaitGroup{}
-	wg.Add(len(ressources))
+	wg.Add(len(ids))
 
 	ch := make(chan prometheus.Metric)
 	done := make(chan bool)
 
-	for id, name := range ressources {
-		go m.retrieveMetricsForId(id, name, ch, wg, labelValues)
+	for _, id := range ids {
+		go m.retrieveMetricsForId(id, ch, wg, labelValues)
 	}
 
 	go func() {
@@ -65,7 +65,7 @@ func (m *StatisticMetricRetriever) RetrieveMetrics(ressources map[string]string,
 	}
 }
 
-func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, name string, ch chan<- prometheus.Metric,
+func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, ch chan<- prometheus.Metric,
 	wg *sync.WaitGroup, labelValues map[string][]string) {
 	defer wg.Done()
 
@@ -80,12 +80,12 @@ func (m *StatisticMetricRetriever) retrieveMetricsForId(id string, name string, 
 
 	for _, s := range stats.Statistic {
 		if s.Kind == "gauge" {
-			ch <- m.convertToMetric(id, name, &s, labelValues)
+			ch <- m.convertToMetric(id, &s, labelValues)
 		}
 	}
 }
 
-func (m *StatisticMetricRetriever) convertToMetric(id string, name string, s *Statistic,
+func (m *StatisticMetricRetriever) convertToMetric(id string, s *Statistic,
 	labelValues map[string][]string) prometheus.Metric {
 	metricName := strings.Replace(s.Name, ".", "_", -1)
 
@@ -94,16 +94,7 @@ func (m *StatisticMetricRetriever) convertToMetric(id string, name string, s *St
 	}
 
 	n := prometheus.BuildFQName("ovirt", m.ressource, metricName)
+	d := prometheus.NewDesc(n, s.Description, m.labelNames, nil)
 
-	labelNames := append([]string{"name"}, m.labelNames...)
-	d := prometheus.NewDesc(n, s.Description, labelNames, nil)
-
-	lv := append([]string{name}, labelValues[id]...)
-	r, err := prometheus.NewConstMetric(d, prometheus.GaugeValue, s.Values.Value.Datum, lv...)
-
-	if err != nil {
-		log.Errorln(err)
-	}
-
-	return r
+	return prometheus.MustNewConstMetric(d, prometheus.GaugeValue, s.Values.Value.Datum, labelValues[id]...)
 }

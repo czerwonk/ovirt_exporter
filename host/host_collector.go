@@ -10,6 +10,18 @@ import (
 	"github.com/prometheus/common/log"
 )
 
+const prefix = "ovirt_host_"
+
+var (
+	upDesc     *prometheus.Desc
+	labelNames []string
+)
+
+func init() {
+	labelNames = []string{"name", "cluster"}
+	upDesc = prometheus.NewDesc(prefix+"up", "Host is running (1) or not (0)", labelNames, nil)
+}
+
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
 	api              *api.ApiClient
@@ -21,8 +33,7 @@ type HostCollector struct {
 
 // NewCollector creates a new collector
 func NewCollector(api *api.ApiClient) prometheus.Collector {
-	l := []string{"cluster"}
-	r := statistic.NewStatisticMetricRetriever("host", api, l)
+	r := statistic.NewStatisticMetricRetriever("host", api, labelNames)
 	c := cluster.NewRetriever(api)
 	return &HostCollector{api: api, retriever: r, clusterRetriever: c}
 }
@@ -54,20 +65,32 @@ func (c *HostCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *HostCollector) retrieveMetrics() {
-	ressources := make(map[string]string)
+	ids := make([]string, 0)
 	labelValues := make(map[string][]string)
 
+	c.metrics = make([]prometheus.Metric, 0)
 	for _, h := range c.getHosts() {
+		ids = append(ids, h.Id)
 		cluster, err := c.clusterRetriever.Get(h.Cluster.Id)
 		if err != nil {
 			log.Error(err)
 		}
 
-		ressources[h.Id] = h.Name
-		labelValues[h.Id] = []string{cluster.Name}
+		labelValues[h.Id] = []string{h.Name, cluster.Name}
+
+		c.metrics = append(c.metrics, c.upMetric(&h, labelValues[h.Id]))
 	}
 
-	c.metrics = c.retriever.RetrieveMetrics(ressources, labelValues)
+	c.metrics = append(c.metrics, c.retriever.RetrieveMetrics(ids, labelValues)...)
+}
+
+func (c *HostCollector) upMetric(h *Host, labelValues []string) prometheus.Metric {
+	var up float64
+	if h.Status == "up" {
+		up = 1
+	}
+
+	return prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, up, labelValues...)
 }
 
 func (c *HostCollector) getHosts() []Host {

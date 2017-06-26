@@ -10,4 +10,5 @@ type Host struct {
 	Cluster struct {
 		Id string `xml:"id,attr"`
 	} `xml:"cluster"`
+	Status string `xml:"status"`
 }
