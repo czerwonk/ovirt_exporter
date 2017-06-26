@@ -16,6 +16,7 @@ go get -u github.com/czerwonk/ovirt_exporter
 ## Supported ressources
 * hosts
 * vms
+* storagedomains
 
 ## Third Party Components
 This software uses components of the following projects
