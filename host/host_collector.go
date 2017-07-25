@@ -29,7 +29,7 @@ func init() {
 	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
 	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
 	cpuSpeedDesc = prometheus.NewDesc(prefix+"cpu_speed", "CPU speed in MHz", labelNames, nil)
-	memoryDesc = prometheus.NewDesc(prefix+"memory_installed_bytes", "CPU speed in MHz", labelNames, nil)
+	memoryDesc = prometheus.NewDesc(prefix+"memory_installed_bytes", "Memory installed in bytes", labelNames, nil)
 }
 
 // HostCollector collects host statistics from oVirt
