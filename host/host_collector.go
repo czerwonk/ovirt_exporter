@@ -13,13 +13,23 @@ import (
 const prefix = "ovirt_host_"
 
 var (
-	upDesc     *prometheus.Desc
-	labelNames []string
+	upDesc         *prometheus.Desc
+	cpuCoresDesc   *prometheus.Desc
+	cpuSocketsDesc *prometheus.Desc
+	cpuThreadsDesc *prometheus.Desc
+	cpuSpeedDesc   *prometheus.Desc
+	memoryDesc     *prometheus.Desc
+	labelNames     []string
 )
 
 func init() {
 	labelNames = []string{"name", "cluster"}
 	upDesc = prometheus.NewDesc(prefix+"up", "Host is running (1) or not (0)", labelNames, nil)
+	cpuCoresDesc = prometheus.NewDesc(prefix+"cpu_cores", "Number of CPU cores assigned", labelNames, nil)
+	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
+	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
+	cpuSpeedDesc = prometheus.NewDesc(prefix+"cpu_speed", "CPU speed in MHz", labelNames, nil)
+	memoryDesc = prometheus.NewDesc(prefix+"memory_installed_bytes", "CPU speed in MHz", labelNames, nil)
 }
 
 // HostCollector collects host statistics from oVirt
@@ -78,10 +88,23 @@ func (c *HostCollector) retrieveMetrics() {
 
 		labelValues[h.Id] = []string{h.Name, cluster.Name}
 
-		c.metrics = append(c.metrics, c.upMetric(&h, labelValues[h.Id]))
+		c.addMetricsForHost(&h, labelValues[h.Id])
 	}
 
 	c.metrics = append(c.metrics, c.retriever.RetrieveMetrics(ids, labelValues)...)
+}
+
+func (c *HostCollector) addMetricsForHost(host *Host, labelValues []string) {
+	c.metrics = append(c.metrics, c.upMetric(host, labelValues))
+	c.addMetric(cpuCoresDesc, float64(host.Cpu.Topology.Cores), labelValues)
+	c.addMetric(cpuThreadsDesc, float64(host.Cpu.Topology.Threads), labelValues)
+	c.addMetric(cpuSocketsDesc, float64(host.Cpu.Topology.Sockets), labelValues)
+	c.addMetric(cpuSpeedDesc, float64(host.Cpu.Speed), labelValues)
+	c.addMetric(memoryDesc, float64(host.Memory), labelValues)
+}
+
+func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
+	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
 }
 
 func (c *HostCollector) upMetric(h *Host, labelValues []string) prometheus.Metric {

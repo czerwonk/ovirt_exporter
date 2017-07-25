@@ -14,13 +14,19 @@ import (
 const prefix = "ovirt_vm_"
 
 var (
-	upDesc     *prometheus.Desc
-	labelNames []string
+	upDesc         *prometheus.Desc
+	cpuCoresDesc   *prometheus.Desc
+	cpuSocketsDesc *prometheus.Desc
+	cpuThreadsDesc *prometheus.Desc
+	labelNames     []string
 )
 
 func init() {
 	labelNames = []string{"name", "host", "cluster"}
 	upDesc = prometheus.NewDesc(prefix+"up", "VM is running (1) or not (0)", labelNames, nil)
+	cpuCoresDesc = prometheus.NewDesc(prefix+"cpu_cores", "Number of CPU cores assigned", labelNames, nil)
+	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
+	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
 }
 
 // VmCollector collects virtual machine statistics from oVirt
@@ -76,10 +82,21 @@ func (c *VmCollector) retrieveMetrics() {
 		ids = append(ids, vm.Id)
 		labelValues[vm.Id] = c.getLabelValues(&vm)
 
-		c.metrics = append(c.metrics, c.upMetric(&vm, labelValues[vm.Id]))
+		c.addMetricsForVm(&vm, labelValues[vm.Id])
 	}
 
 	c.metrics = append(c.metrics, c.retriever.RetrieveMetrics(ids, labelValues)...)
+}
+
+func (c *VmCollector) addMetricsForVm(vm *Vm, labelValues []string) {
+	c.metrics = append(c.metrics, c.upMetric(vm, labelValues))
+	c.addMetric(cpuCoresDesc, float64(vm.Cpu.Topology.Cores), labelValues)
+	c.addMetric(cpuThreadsDesc, float64(vm.Cpu.Topology.Threads), labelValues)
+	c.addMetric(cpuSocketsDesc, float64(vm.Cpu.Topology.Sockets), labelValues)
+}
+
+func (c *VmCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
+	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
 }
 
 func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {

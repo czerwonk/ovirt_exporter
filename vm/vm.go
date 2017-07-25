@@ -14,4 +14,11 @@ type Vm struct {
 		Id string `xml:"id,attr"`
 	} `xml:"cluster,omitempty"`
 	Status string `xml:"status"`
+	Cpu    struct {
+		Topology struct {
+			Cores   int `xml:"cores"`
+			Sockets int `xml:"sockets"`
+			Threads int `xml:"threads"`
+		} `xml:"topology"`
+	} `xml:"cpu"`
 }
