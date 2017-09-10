@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 
+	"errors"
+
 	"github.com/prometheus/common/log"
 )
 
@@ -56,6 +58,10 @@ func (c *ApiClient) Get(path string) ([]byte, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode >= 300 {
+		return nil, errors.New(resp.Status)
 	}
 
 	defer resp.Body.Close()
