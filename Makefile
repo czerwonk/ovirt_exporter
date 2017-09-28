@@ -7,7 +7,7 @@ VERSION=$(shell \
 	|sed -e "s/ //g")
 
 SHELL = /bin/bash
-
+GO = go
 DIR = $(shell pwd)
 
 NO_COLOR=\033[0m
