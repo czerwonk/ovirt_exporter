@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
-	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
+	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.4.0"
+const version string = "0.5.0"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -25,7 +27,6 @@ var (
 	apiUser         = flag.String("api.username", "user@internal", "API username")
 	apiPass         = flag.String("api.password", "", "API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
-	client          *api.ApiClient
 )
 
 func init() {
@@ -69,17 +70,35 @@ func startServer() {
 	})
 	http.HandleFunc(*metricsPath, handleMetricsRequest)
 
-	client = api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert)
-
 	log.Infof("Listening for %s on %s\n", *metricsPath, *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
+	conn, err := ovirtsdk4.NewConnectionBuilder().
+		URL(strings.TrimRight(*apiUrl, "/")).
+		Username(*apiUser).
+		Password(*apiPass).
+		Insecure(*apiInsecureCert).
+		Timeout(10 * time.Second).
+		Compress(true).
+		Build()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	defer conn.Close()
+
+	err = conn.Test()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client))
-	reg.MustRegister(host.NewCollector(client))
-	reg.MustRegister(storagedomain.NewCollector(client))
+	reg.MustRegister(vm.NewCollector(conn))
+	reg.MustRegister(host.NewCollector(conn))
+	reg.MustRegister(storagedomain.NewCollector(conn))
 
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),

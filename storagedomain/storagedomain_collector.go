@@ -1,8 +1,10 @@
 package storagedomain
 
 import (
-	"github.com/czerwonk/ovirt_exporter/api"
-	"github.com/czerwonk/ovirt_exporter/datacenter"
+	"sync"
+
+	"github.com/czerwonk/ovirt_exporter/metric"
+	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -18,7 +20,7 @@ var (
 )
 
 func init() {
-	l := []string{"name", "type", "path", "datacenter"}
+	l := []string{"name", "type", "path"}
 	availableDesc = prometheus.NewDesc(prefix+"available_bytes", "Available space in bytes", l, nil)
 	usedDesc = prometheus.NewDesc(prefix+"used_bytes", "Used space in bytes", l, nil)
 	commitedDesc = prometheus.NewDesc(prefix+"commited_bytes", "Commited space in bytes", l, nil)
@@ -28,21 +30,32 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	api                 *api.ApiClient
-	datacenterRetriever *datacenter.DatacenterRetriever
+	conn *ovirtsdk4.Connection
 }
 
 // NewCollector creates a new collector
-func NewCollector(c *api.ApiClient) prometheus.Collector {
-	dc := datacenter.NewRetriever(c)
-	return &StorageDomainCollector{api: c, datacenterRetriever: dc}
+func NewCollector(conn *ovirtsdk4.Connection) prometheus.Collector {
+	return &StorageDomainCollector{conn: conn}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
-	for _, d := range c.getDomains() {
-		c.collectMetricsForDomain(&d, ch)
+	s := c.conn.SystemService().StorageDomainsService()
+	resp, err := s.List().Send()
+	if err != nil {
+		log.Error(err)
+		return
 	}
+
+	wg := &sync.WaitGroup{}
+	slice := resp.MustStorageDomains().Slice()
+	wg.Add(len(slice))
+
+	for _, h := range slice {
+		go c.collectMetricsForDomain(h, ch, wg)
+	}
+
+	wg.Wait()
 }
 
 // Describe implements Prometheus Collector interface
@@ -54,31 +67,41 @@ func (c *StorageDomainCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- commitedDesc
 }
 
-func (c *StorageDomainCollector) getDomains() []StorageDomain {
-	var domains StorageDomains
-	err := c.api.GetAndParse("storagedomains", &domains)
+func (c *StorageDomainCollector) collectMetricsForDomain(domain ovirtsdk4.StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	if err != nil {
-		log.Error(err)
+	d := &domain
+	l := []string{d.MustName(), string(d.MustType()), c.storagePath(d)}
+
+	up := d.MustExternalStatus() == "ok"
+	ch <- metric.MustCreate(upDesc, boolToFloat(up), l)
+	ch <- metric.MustCreate(masterDesc, boolToFloat(d.MustMaster()), l)
+
+	if v, ok := d.Available(); ok {
+		ch <- metric.MustCreate(availableDesc, float64(v), l)
 	}
 
-	return domains.Domains
+	if v, ok := d.Used(); ok {
+		ch <- metric.MustCreate(usedDesc, float64(v), l)
+	}
+
+	if v, ok := d.Committed(); ok {
+		ch <- metric.MustCreate(commitedDesc, float64(v), l)
+	}
 }
 
-func (c *StorageDomainCollector) collectMetricsForDomain(d *StorageDomain, ch chan<- prometheus.Metric) {
-	dc, err := c.datacenterRetriever.Get(d.DataCenters.DataCenter.Id)
-	if err != nil {
-		log.Error(err)
+func (c *StorageDomainCollector) storagePath(d *ovirtsdk4.StorageDomain) string {
+	s, ok := d.Storage()
+	if !ok {
+		return ""
 	}
 
-	l := []string{d.Name, d.Type, d.Storage.Path, dc.Name}
+	p, ok := s.Path()
+	if !ok {
+		return ""
+	}
 
-	up := d.ExternalStatus == "ok"
-	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, boolToFloat(up), l...)
-	ch <- prometheus.MustNewConstMetric(masterDesc, prometheus.GaugeValue, boolToFloat(d.Master), l...)
-	ch <- prometheus.MustNewConstMetric(availableDesc, prometheus.GaugeValue, d.Available, l...)
-	ch <- prometheus.MustNewConstMetric(usedDesc, prometheus.GaugeValue, d.Used, l...)
-	ch <- prometheus.MustNewConstMetric(commitedDesc, prometheus.GaugeValue, d.Committed, l...)
+	return p
 }
 
 func boolToFloat(b bool) float64 {

@@ -3,10 +3,11 @@ package vm
 import (
 	"sync"
 
-	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/host"
+	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/czerwonk/ovirt_exporter/statistic"
+	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -31,20 +32,14 @@ func init() {
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	api              *api.ApiClient
-	metrics          []prometheus.Metric
-	mutex            sync.Mutex
-	retriever        *statistic.StatisticMetricRetriever
-	hostRetriever    *host.HostRetriever
-	clusterRetriever *cluster.ClusterRetriever
+	conn    *ovirtsdk4.Connection
+	metrics []prometheus.Metric
+	mutex   sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(api *api.ApiClient) prometheus.Collector {
-	r := statistic.NewStatisticMetricRetriever("vm", api, labelNames)
-	h := host.NewRetriever(api)
-	c := cluster.NewRetriever(api)
-	return &VmCollector{api: api, retriever: r, hostRetriever: h, clusterRetriever: c}
+func NewCollector(conn *ovirtsdk4.Connection) prometheus.Collector {
+	return &VmCollector{conn: conn}
 }
 
 // Collect implements Prometheus Collector interface
@@ -74,66 +69,91 @@ func (c *VmCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *VmCollector) retrieveMetrics() {
-	ids := make([]string, 0)
-	labelValues := make(map[string][]string)
-
-	c.metrics = make([]prometheus.Metric, 0)
-	for _, vm := range c.getVms() {
-		ids = append(ids, vm.Id)
-		labelValues[vm.Id] = c.getLabelValues(&vm)
-
-		c.addMetricsForVm(&vm, labelValues[vm.Id])
+	s := c.conn.SystemService().VmsService()
+	resp, err := s.List().Send()
+	if err != nil {
+		log.Error(err)
+		return
 	}
 
-	c.metrics = append(c.metrics, c.retriever.RetrieveMetrics(ids, labelValues)...)
+	wg := &sync.WaitGroup{}
+	slice := resp.MustVms().Slice()
+	wg.Add(len(slice))
+
+	ch := make(chan prometheus.Metric)
+	for _, v := range slice {
+		go c.collectForVm(v, ch, wg)
+	}
+
+	done := make(chan bool)
+	go func() {
+		wg.Wait()
+		done <- true
+	}()
+
+	for {
+		select {
+		case m := <-ch:
+			c.metrics = append(c.metrics, m)
+
+		case <-done:
+			return
+		}
+	}
 }
 
-func (c *VmCollector) addMetricsForVm(vm *Vm, labelValues []string) {
-	c.metrics = append(c.metrics, c.upMetric(vm, labelValues))
-	c.addMetric(cpuCoresDesc, float64(vm.Cpu.Topology.Cores), labelValues)
-	c.addMetric(cpuThreadsDesc, float64(vm.Cpu.Topology.Threads), labelValues)
-	c.addMetric(cpuSocketsDesc, float64(vm.Cpu.Topology.Sockets), labelValues)
+func (c *VmCollector) collectForVm(vm ovirtsdk4.Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	v := &vm
+	l := []string{v.MustName(), c.hostName(v), c.clusterName(v)}
+
+	ch <- c.upMetric(v, l)
+
+	c.collectCpuMetrics(v, ch, l)
+
+	if stats, ok := v.Statistics(); ok {
+		statistic.CollectStatisticMetrics(prefix, c.conn, stats, ch, labelNames, l)
+	}
 }
 
-func (c *VmCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
-	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
+func (c *VmCollector) collectCpuMetrics(vm *ovirtsdk4.Vm, ch chan<- prometheus.Metric, l []string) {
+	topo := vm.MustCpu().MustTopology()
+	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.MustCores()), l)
+	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.MustThreads()), l)
+	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.MustSockets()), l)
 }
 
-func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {
+func (c *VmCollector) hostName(vm *ovirtsdk4.Vm) string {
+	h, ok := vm.Host()
+	if !ok {
+		return ""
+	}
+
+	h, err := host.Follow(h, c.conn)
+	if err != nil {
+		log.Error(err)
+		return ""
+	}
+
+	return h.MustName()
+}
+
+func (c *VmCollector) clusterName(vm *ovirtsdk4.Vm) string {
+	cl, err := cluster.Follow(vm.MustCluster(), c.conn)
+	if err != nil {
+		log.Error(err)
+		return ""
+	}
+
+	return cl.MustName()
+}
+
+func (c *VmCollector) upMetric(vm *ovirtsdk4.Vm, labelValues []string) prometheus.Metric {
 	var up float64
-	if vm.Status == "up" {
+	if vm.MustStatus() == "up" {
 		up = 1
 	}
 
-	return prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, up, labelValues...)
-}
-
-func (c *VmCollector) getLabelValues(vm *Vm) []string {
-	h := &host.Host{}
-	var err error
-
-	if len(vm.Host.Id) > 0 {
-		h, err = c.hostRetriever.Get(vm.Host.Id)
-		if err != nil {
-			log.Error(err)
-		}
-	}
-
-	cl, err := c.clusterRetriever.Get(vm.Cluster.Id)
-	if err != nil {
-		log.Error(err)
-	}
-
-	return []string{vm.Name, h.Name, cl.Name}
-}
-
-func (c *VmCollector) getVms() []Vm {
-	var vms Vms
-	err := c.api.GetAndParse("vms", &vms)
-
-	if err != nil {
-		log.Error(err)
-	}
-
-	return vms.Vm
+	return metric.MustCreate(upDesc, up, labelValues)
 }
