@@ -10,8 +10,6 @@ SHELL = /bin/bash
 
 DIR = $(shell pwd)
 
-GO = go
-
 NO_COLOR=\033[0m
 OK_COLOR=\033[32;01m
 ERROR_COLOR=\033[31;01m
@@ -45,12 +43,12 @@ deps: ## Update dependencies
 .PHONY: build
 build: ## Make binary
 	@echo -e "$(OK_COLOR)[$(APP)] Build $(NO_COLOR)"
-	@$(GO) build .
+	@go build .
 
 .PHONY: test
 test: ## Launch unit tests
 	@echo -e "$(OK_COLOR)[$(APP)] Launch unit tests $(NO_COLOR)"
-	@go test
+	@go test .
 
 .PHONY: lint
 lint: ## Launch golint
