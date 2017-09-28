@@ -16,3 +16,5 @@
 # IDE specific files
 .idea/
 *.iml
+
+vendor/github.com/imjoey/go-ovirt/examples
