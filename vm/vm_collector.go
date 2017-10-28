@@ -40,15 +40,15 @@ func init() {
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	conn            *ovirtsdk.Connection
-	metrics         []prometheus.Metric
-	collectSnaphots bool
-	mutex           sync.Mutex
+	conn             *ovirtsdk.Connection
+	metrics          []prometheus.Metric
+	collectSnapshots bool
+	mutex            sync.Mutex
 }
 
 // NewCollector creates a new collector
 func NewCollector(conn *ovirtsdk.Connection, collectSnaphots bool) prometheus.Collector {
-	return &VmCollector{conn: conn, collectSnaphots: collectSnaphots}
+	return &VmCollector{conn: conn, collectSnapshots: collectSnaphots}
 }
 
 // Collect implements Prometheus Collector interface
@@ -125,7 +125,7 @@ func (c *VmCollector) collectForVm(vm ovirtsdk.Vm, ch chan<- prometheus.Metric, 
 		statistic.CollectStatisticMetrics(prefix, c.conn, stats, ch, labelNames, l)
 	}
 
-	if c.collectSnaphots {
+	if c.collectSnapshots {
 		c.collectSnapshotMetrics(v, ch, l)
 	}
 }
