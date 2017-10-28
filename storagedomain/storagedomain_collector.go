@@ -30,11 +30,11 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	conn *ovirtsdk4.Connection
+	conn *ovirtsdk.Connection
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk4.Connection) prometheus.Collector {
+func NewCollector(conn *ovirtsdk.Connection) prometheus.Collector {
 	return &StorageDomainCollector{conn: conn}
 }
 
@@ -67,7 +67,7 @@ func (c *StorageDomainCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- commitedDesc
 }
 
-func (c *StorageDomainCollector) collectMetricsForDomain(domain ovirtsdk4.StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *StorageDomainCollector) collectMetricsForDomain(domain ovirtsdk.StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	d := &domain
@@ -90,7 +90,7 @@ func (c *StorageDomainCollector) collectMetricsForDomain(domain ovirtsdk4.Storag
 	}
 }
 
-func (c *StorageDomainCollector) storagePath(d *ovirtsdk4.StorageDomain) string {
+func (c *StorageDomainCollector) storagePath(d *ovirtsdk.StorageDomain) string {
 	s, ok := d.Storage()
 	if !ok {
 		return ""

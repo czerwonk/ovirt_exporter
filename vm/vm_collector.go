@@ -3,6 +3,8 @@ package vm
 import (
 	"sync"
 
+	"time"
+
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/metric"
@@ -19,6 +21,9 @@ var (
 	cpuCoresDesc   *prometheus.Desc
 	cpuSocketsDesc *prometheus.Desc
 	cpuThreadsDesc *prometheus.Desc
+	snapshotCount  *prometheus.Desc
+	minSnapshotAge *prometheus.Desc
+	maxSnapshotAge *prometheus.Desc
 	labelNames     []string
 )
 
@@ -28,18 +33,22 @@ func init() {
 	cpuCoresDesc = prometheus.NewDesc(prefix+"cpu_cores", "Number of CPU cores assigned", labelNames, nil)
 	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
 	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
+	snapshotCount = prometheus.NewDesc(prefix+"snapshot_count", "Number of snapshots", labelNames, nil)
+	maxSnapshotAge = prometheus.NewDesc(prefix+"snapshot_max_age_minutes", "Age of the oldest snapshot in minutes", labelNames, nil)
+	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_minutes", "Age of the newest snapshot in minutes", labelNames, nil)
 }
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	conn    *ovirtsdk4.Connection
-	metrics []prometheus.Metric
-	mutex   sync.Mutex
+	conn            *ovirtsdk.Connection
+	metrics         []prometheus.Metric
+	collectSnaphots bool
+	mutex           sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk4.Connection) prometheus.Collector {
-	return &VmCollector{conn: conn}
+func NewCollector(conn *ovirtsdk.Connection, collectSnaphots bool) prometheus.Collector {
+	return &VmCollector{conn: conn, collectSnaphots: collectSnaphots}
 }
 
 // Collect implements Prometheus Collector interface
@@ -102,11 +111,11 @@ func (c *VmCollector) retrieveMetrics() {
 	}
 }
 
-func (c *VmCollector) collectForVm(vm ovirtsdk4.Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *VmCollector) collectForVm(vm ovirtsdk.Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	v := &vm
-	l := []string{v.MustName(), c.hostName(v), c.clusterName(v)}
+	l := []string{v.MustName(), c.hostName(v), cluster.Name(v.MustCluster(), c.conn)}
 
 	ch <- c.upMetric(v, l)
 
@@ -115,45 +124,54 @@ func (c *VmCollector) collectForVm(vm ovirtsdk4.Vm, ch chan<- prometheus.Metric,
 	if stats, ok := v.Statistics(); ok {
 		statistic.CollectStatisticMetrics(prefix, c.conn, stats, ch, labelNames, l)
 	}
+
+	if c.collectSnaphots {
+		c.collectSnapshotMetrics(v, ch, l)
+	}
 }
 
-func (c *VmCollector) collectCpuMetrics(vm *ovirtsdk4.Vm, ch chan<- prometheus.Metric, l []string) {
+func (c *VmCollector) collectCpuMetrics(vm *ovirtsdk.Vm, ch chan<- prometheus.Metric, l []string) {
 	topo := vm.MustCpu().MustTopology()
 	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.MustCores()), l)
 	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.MustThreads()), l)
 	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.MustSockets()), l)
 }
 
-func (c *VmCollector) hostName(vm *ovirtsdk4.Vm) string {
+func (c *VmCollector) hostName(vm *ovirtsdk.Vm) string {
 	h, ok := vm.Host()
 	if !ok {
 		return ""
 	}
 
-	h, err := host.Follow(h, c.conn)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	return h.MustName()
+	return host.Name(h, c.conn)
 }
 
-func (c *VmCollector) clusterName(vm *ovirtsdk4.Vm) string {
-	cl, err := cluster.Follow(vm.MustCluster(), c.conn)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	return cl.MustName()
-}
-
-func (c *VmCollector) upMetric(vm *ovirtsdk4.Vm, labelValues []string) prometheus.Metric {
+func (c *VmCollector) upMetric(vm *ovirtsdk.Vm, labelValues []string) prometheus.Metric {
 	var up float64
 	if vm.MustStatus() == "up" {
 		up = 1
 	}
 
 	return metric.MustCreate(upDesc, up, labelValues)
+}
+
+func (c *VmCollector) collectSnapshotMetrics(vm *ovirtsdk.Vm, ch chan<- prometheus.Metric, l []string) {
+	snaps, err := followSnapShots(vm.MustSnapshots(), c.conn)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	s := snaps.Slice()[1:]
+	ch <- metric.MustCreate(snapshotCount, float64(len(s)), l)
+
+	if len(s) == 0 {
+		return
+	}
+
+	min := s[0]
+	ch <- metric.MustCreate(maxSnapshotAge, time.Since(min.MustDate()).Seconds(), l)
+
+	max := s[len(s)-1]
+	ch <- metric.MustCreate(minSnapshotAge, time.Since(max.MustDate()).Seconds(), l)
 }

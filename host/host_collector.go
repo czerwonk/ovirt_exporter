@@ -35,13 +35,13 @@ func init() {
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	conn    *ovirtsdk4.Connection
+	conn    *ovirtsdk.Connection
 	metrics []prometheus.Metric
 	mutex   sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk4.Connection) prometheus.Collector {
+func NewCollector(conn *ovirtsdk.Connection) prometheus.Collector {
 	return &HostCollector{conn: conn}
 }
 
@@ -105,11 +105,11 @@ func (c *HostCollector) retrieveMetrics() {
 	}
 }
 
-func (c *HostCollector) collectForHost(host ovirtsdk4.Host, ch chan prometheus.Metric, wg *sync.WaitGroup) {
+func (c *HostCollector) collectForHost(host ovirtsdk.Host, ch chan prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	h := &host
-	l := []string{h.MustName(), c.clusterName(h)}
+	l := []string{h.MustName(), cluster.Name(h.MustCluster(), c.conn)}
 
 	ch <- c.upMetric(h, l)
 	ch <- metric.MustCreate(memoryDesc, float64(host.MustMemory()), l)
@@ -120,7 +120,7 @@ func (c *HostCollector) collectForHost(host ovirtsdk4.Host, ch chan prometheus.M
 	}
 }
 
-func (c *HostCollector) collectCpuMetrics(host *ovirtsdk4.Host, ch chan prometheus.Metric, l []string) {
+func (c *HostCollector) collectCpuMetrics(host *ovirtsdk.Host, ch chan prometheus.Metric, l []string) {
 	topo := host.MustCpu().MustTopology()
 	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.MustCores()), l)
 	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.MustThreads()), l)
@@ -128,21 +128,11 @@ func (c *HostCollector) collectCpuMetrics(host *ovirtsdk4.Host, ch chan promethe
 	ch <- metric.MustCreate(cpuSpeedDesc, float64(host.MustCpu().MustSpeed()), l)
 }
 
-func (c *HostCollector) clusterName(host *ovirtsdk4.Host) string {
-	cl, err := cluster.Follow(host.MustCluster(), c.conn)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	return cl.MustName()
-}
-
 func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
 	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
 }
 
-func (c *HostCollector) upMetric(h *ovirtsdk4.Host, labelValues []string) prometheus.Metric {
+func (c *HostCollector) upMetric(h *ovirtsdk.Host, labelValues []string) prometheus.Metric {
 	var up float64
 	if h.MustStatus() == "up" {
 		up = 1

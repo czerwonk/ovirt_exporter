@@ -17,7 +17,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.5.0"
+const version string = "0.6.0"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -27,6 +27,7 @@ var (
 	apiUser         = flag.String("api.username", "user@internal", "API username")
 	apiPass         = flag.String("api.password", "", "API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
+	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
 )
 
 func init() {
@@ -75,12 +76,12 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	conn, err := ovirtsdk4.NewConnectionBuilder().
+	conn, err := ovirtsdk.NewConnectionBuilder().
 		URL(strings.TrimRight(*apiUrl, "/")).
 		Username(*apiUser).
 		Password(*apiPass).
 		Insecure(*apiInsecureCert).
-		Timeout(10 * time.Second).
+		Timeout(5 * time.Minute).
 		Compress(true).
 		Build()
 	if err != nil {
@@ -96,7 +97,7 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(conn))
+	reg.MustRegister(vm.NewCollector(conn, *withSnapshots))
 	reg.MustRegister(host.NewCollector(conn))
 	reg.MustRegister(storagedomain.NewCollector(conn))
 

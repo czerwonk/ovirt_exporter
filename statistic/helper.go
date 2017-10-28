@@ -9,14 +9,14 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-func CollectStatisticMetrics(prefix string, conn *ovirtsdk4.Connection, stats *ovirtsdk4.StatisticSlice, ch chan<- prometheus.Metric, labelNames []string, labelValues []string) {
+func CollectStatisticMetrics(prefix string, conn *ovirtsdk.Connection, stats *ovirtsdk.StatisticSlice, ch chan<- prometheus.Metric, labelNames []string, labelValues []string) {
 	x, err := conn.FollowLink(stats)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	stats = x.(*ovirtsdk4.StatisticSlice)
+	stats = x.(*ovirtsdk.StatisticSlice)
 
 	for _, s := range stats.Slice() {
 		metricName := strings.Replace(s.MustName(), ".", "_", -1)
