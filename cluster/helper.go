@@ -3,7 +3,9 @@ package cluster
 import (
 	"sync"
 
-	"github.com/imjoey/go-ovirt"
+	"fmt"
+
+	"github.com/czerwonk/ovirt_api"
 	"github.com/prometheus/common/log"
 )
 
@@ -12,31 +14,32 @@ var (
 	nameCache  = make(map[string]string)
 )
 
-func Follow(cl *ovirtsdk.Cluster, conn *ovirtsdk.Connection) (*ovirtsdk.Cluster, error) {
-	x, err := conn.FollowLink(cl)
+func Get(id string, client *ovirt_api.ApiClient) (*Cluster, error) {
+	path := fmt.Sprintf("clusters/%s", id)
+
+	c := Cluster{}
+	err := client.GetAndParse(path, &c)
 	if err != nil {
-		log.Error(err)
 		return nil, err
 	}
 
-	cl = x.(*ovirtsdk.Cluster)
-	return cl, nil
+	return &c, nil
 }
 
-func Name(c *ovirtsdk.Cluster, conn *ovirtsdk.Connection) string {
+func Name(id string, client *ovirt_api.ApiClient) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
-	if n, found := nameCache[c.MustId()]; found {
+	if n, found := nameCache[id]; found {
 		return n
 	}
 
-	c, err := Follow(c, conn)
+	h, err := Get(id, client)
 	if err != nil {
 		log.Error(err)
 		return ""
 	}
 
-	nameCache[c.MustId()] = c.MustName()
-	return c.MustName()
+	nameCache[id] = h.Name
+	return h.Name
 }

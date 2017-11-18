@@ -3,31 +3,36 @@ package statistic
 import (
 	"strings"
 
+	"fmt"
+
+	"github.com/czerwonk/ovirt_api"
 	"github.com/czerwonk/ovirt_exporter/metric"
-	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
-func CollectStatisticMetrics(prefix string, conn *ovirtsdk.Connection, stats *ovirtsdk.StatisticSlice, ch chan<- prometheus.Metric, labelNames []string, labelValues []string) {
-	x, err := conn.FollowLink(stats)
+func CollectMetrics(path, prefix string, labelNames, labelValues []string, client *ovirt_api.ApiClient, ch chan<- prometheus.Metric) error {
+	stats := Statistics{}
+	err := client.GetAndParse(path, &stats)
 	if err != nil {
-		log.Error(err)
-		return
+		return err
 	}
 
-	stats = x.(*ovirtsdk.StatisticSlice)
-
-	for _, s := range stats.Slice() {
-		metricName := strings.Replace(s.MustName(), ".", "_", -1)
-
-		if s.MustUnit() != "none" {
-			metricName += "_" + string(s.MustUnit())
+	for _, s := range stats.Statistic {
+		if s.Kind == "gauge" {
+			ch <- convertToMetric(s, prefix, labelNames, labelValues)
 		}
-
-		n := prefix + metricName
-		d := prometheus.NewDesc(n, s.MustDescription(), labelNames, nil)
-
-		ch <- metric.MustCreate(d, s.MustValues().Slice()[0].MustDatum(), labelValues)
 	}
+	return nil
+}
+
+func convertToMetric(s Statistic, prefix string, labelNames, labelValues []string) prometheus.Metric {
+	metricName := strings.Replace(s.Name, ".", "_", -1)
+
+	if s.Unit != "none" {
+		metricName += "_" + s.Unit
+	}
+
+	d := prometheus.NewDesc(fmt.Sprint(prefix, metricName), s.Description, labelNames, nil)
+
+	return metric.MustCreate(d, s.Values.Value.Datum, labelValues)
 }

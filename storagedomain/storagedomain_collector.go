@@ -3,8 +3,8 @@ package storagedomain
 import (
 	"sync"
 
+	"github.com/czerwonk/ovirt_api"
 	"github.com/czerwonk/ovirt_exporter/metric"
-	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -30,28 +30,27 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	conn *ovirtsdk.Connection
+	client *ovirt_api.ApiClient
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk.Connection) prometheus.Collector {
-	return &StorageDomainCollector{conn: conn}
+func NewCollector(client *ovirt_api.ApiClient) prometheus.Collector {
+	return &StorageDomainCollector{client: client}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
-	s := c.conn.SystemService().StorageDomainsService()
-	resp, err := s.List().Send()
+	s := StorageDomains{}
+	err := c.client.GetAndParse("storagedomains", &s)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	wg := &sync.WaitGroup{}
-	slice := resp.MustStorageDomains().Slice()
-	wg.Add(len(slice))
+	wg.Add(len(s.Domains))
 
-	for _, h := range slice {
+	for _, h := range s.Domains {
 		go c.collectMetricsForDomain(h, ch, wg)
 	}
 
@@ -67,41 +66,18 @@ func (c *StorageDomainCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- commitedDesc
 }
 
-func (c *StorageDomainCollector) collectMetricsForDomain(domain ovirtsdk.StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *StorageDomainCollector) collectMetricsForDomain(domain StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	d := &domain
-	l := []string{d.MustName(), string(d.MustType()), c.storagePath(d)}
+	l := []string{d.Name, string(d.Type), d.Storage.Path}
 
-	up := d.MustExternalStatus() == "ok"
+	up := d.ExternalStatus == "ok"
 	ch <- metric.MustCreate(upDesc, boolToFloat(up), l)
-	ch <- metric.MustCreate(masterDesc, boolToFloat(d.MustMaster()), l)
-
-	if v, ok := d.Available(); ok {
-		ch <- metric.MustCreate(availableDesc, float64(v), l)
-	}
-
-	if v, ok := d.Used(); ok {
-		ch <- metric.MustCreate(usedDesc, float64(v), l)
-	}
-
-	if v, ok := d.Committed(); ok {
-		ch <- metric.MustCreate(commitedDesc, float64(v), l)
-	}
-}
-
-func (c *StorageDomainCollector) storagePath(d *ovirtsdk.StorageDomain) string {
-	s, ok := d.Storage()
-	if !ok {
-		return ""
-	}
-
-	p, ok := s.Path()
-	if !ok {
-		return ""
-	}
-
-	return p
+	ch <- metric.MustCreate(masterDesc, boolToFloat(d.Master), l)
+	ch <- metric.MustCreate(availableDesc, float64(d.Available), l)
+	ch <- metric.MustCreate(usedDesc, float64(d.Used), l)
+	ch <- metric.MustCreate(commitedDesc, float64(d.Committed), l)
 }
 
 func boolToFloat(b bool) float64 {

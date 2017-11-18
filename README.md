@@ -22,7 +22,6 @@ go get -u github.com/czerwonk/ovirt_exporter
 ## Third Party Components
 This software uses components of the following projects
 * Prometheus Go client library (https://github.com/prometheus/client_golang)
-* go-ovirt (https://github.com/imjoey/go-ovirt)
 
 ## License
 (c) Daniel Czerwonk, 2017. Licensed under [MIT](LICENSE) license.

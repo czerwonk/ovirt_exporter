@@ -3,7 +3,9 @@ package host
 import (
 	"sync"
 
-	"github.com/imjoey/go-ovirt"
+	"fmt"
+
+	"github.com/czerwonk/ovirt_api"
 	"github.com/prometheus/common/log"
 )
 
@@ -12,31 +14,32 @@ var (
 	nameCache  = make(map[string]string)
 )
 
-func Follow(h *ovirtsdk.Host, conn *ovirtsdk.Connection) (*ovirtsdk.Host, error) {
-	x, err := conn.FollowLink(h)
+func Get(id string, client *ovirt_api.ApiClient) (*Host, error) {
+	path := fmt.Sprintf("hosts/%s", id)
+
+	h := Host{}
+	err := client.GetAndParse(path, &h)
 	if err != nil {
-		log.Error(err)
 		return nil, err
 	}
 
-	h = x.(*ovirtsdk.Host)
-	return h, nil
+	return &h, nil
 }
 
-func Name(h *ovirtsdk.Host, conn *ovirtsdk.Connection) string {
+func Name(id string, client *ovirt_api.ApiClient) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
-	if n, found := nameCache[h.MustId()]; found {
+	if n, found := nameCache[id]; found {
 		return n
 	}
 
-	h, err := Follow(h, conn)
+	h, err := Get(id, client)
 	if err != nil {
 		log.Error(err)
 		return ""
 	}
 
-	nameCache[h.MustId()] = h.MustName()
-	return h.MustName()
+	nameCache[id] = h.Name
+	return h.Name
 }
