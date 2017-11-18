@@ -26,12 +26,6 @@
   revision = "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 
 [[projects]]
-  name = "github.com/imjoey/go-ovirt"
-  packages = ["."]
-  revision = "02de8257d19aeae9ac085472671208e02273d6bf"
-  version = "v4.0.1"
-
-[[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
   revision = "3247c84500bff8d9fb6d579d800f20b3e091582c"
@@ -88,6 +82,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e92f4ac980306b8071efde130ef49258218b415a3fd23aa337de7f1e398113a5"
+  inputs-digest = "a6cebbe049ed9f30fbcbc092e916b2f4c9deda42c90b933dbe9c4872524d3880"
   solver-name = "gps-cdcl"
   solver-version = 1

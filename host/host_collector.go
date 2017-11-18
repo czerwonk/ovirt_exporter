@@ -3,10 +3,12 @@ package host
 import (
 	"sync"
 
+	"fmt"
+
+	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/czerwonk/ovirt_exporter/statistic"
-	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -35,14 +37,14 @@ func init() {
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	conn    *ovirtsdk.Connection
+	client  *api.ApiClient
 	metrics []prometheus.Metric
 	mutex   sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk.Connection) prometheus.Collector {
-	return &HostCollector{conn: conn}
+func NewCollector(client *api.ApiClient) prometheus.Collector {
+	return &HostCollector{client: client}
 }
 
 // Collect implements Prometheus Collector interface
@@ -72,19 +74,18 @@ func (c *HostCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *HostCollector) retrieveMetrics() {
-	s := c.conn.SystemService().HostsService()
-	resp, err := s.List().Send()
+	h := Hosts{}
+	err := c.client.GetAndParse("hosts", &h)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	wg := &sync.WaitGroup{}
-	slice := resp.MustHosts().Slice()
-	wg.Add(len(slice))
+	wg.Add(len(h.Host))
 
 	ch := make(chan prometheus.Metric)
-	for _, h := range slice {
+	for _, h := range h.Host {
 		go c.collectForHost(h, ch, wg)
 	}
 
@@ -105,36 +106,35 @@ func (c *HostCollector) retrieveMetrics() {
 	}
 }
 
-func (c *HostCollector) collectForHost(host ovirtsdk.Host, ch chan prometheus.Metric, wg *sync.WaitGroup) {
+func (c *HostCollector) collectForHost(host Host, ch chan prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	h := &host
-	l := []string{h.MustName(), cluster.Name(h.MustCluster(), c.conn)}
+	l := []string{h.Name, cluster.Name(h.Cluster.Id, c.client)}
 
 	ch <- c.upMetric(h, l)
-	ch <- metric.MustCreate(memoryDesc, float64(host.MustMemory()), l)
+	ch <- metric.MustCreate(memoryDesc, float64(host.Memory), l)
 	c.collectCpuMetrics(h, ch, l)
 
-	if stats, ok := h.Statistics(); ok {
-		statistic.CollectStatisticMetrics(prefix, c.conn, stats, ch, labelNames, l)
-	}
+	statPath := fmt.Sprintf("hosts/%s/statistics", host.Id)
+	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
 }
 
-func (c *HostCollector) collectCpuMetrics(host *ovirtsdk.Host, ch chan prometheus.Metric, l []string) {
-	topo := host.MustCpu().MustTopology()
-	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.MustCores()), l)
-	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.MustThreads()), l)
-	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.MustSockets()), l)
-	ch <- metric.MustCreate(cpuSpeedDesc, float64(host.MustCpu().MustSpeed()), l)
+func (c *HostCollector) collectCpuMetrics(host *Host, ch chan prometheus.Metric, l []string) {
+	topo := host.Cpu.Topology
+	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l)
+	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l)
+	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l)
+	ch <- metric.MustCreate(cpuSpeedDesc, float64(host.Cpu.Speed), l)
 }
 
 func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
 	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
 }
 
-func (c *HostCollector) upMetric(h *ovirtsdk.Host, labelValues []string) prometheus.Metric {
+func (c *HostCollector) upMetric(h *Host, labelValues []string) prometheus.Metric {
 	var up float64
-	if h.MustStatus() == "up" {
+	if h.Status == "up" {
 		up = 1
 	}
 

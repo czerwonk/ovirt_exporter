@@ -3,13 +3,15 @@ package vm
 import (
 	"sync"
 
+	"fmt"
+
 	"time"
 
+	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/czerwonk/ovirt_exporter/statistic"
-	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -40,15 +42,15 @@ func init() {
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	conn             *ovirtsdk.Connection
+	client           *api.ApiClient
 	metrics          []prometheus.Metric
 	collectSnapshots bool
 	mutex            sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(conn *ovirtsdk.Connection, collectSnaphots bool) prometheus.Collector {
-	return &VmCollector{conn: conn, collectSnapshots: collectSnaphots}
+func NewCollector(client *api.ApiClient, collectSnaphots bool) prometheus.Collector {
+	return &VmCollector{client: client, collectSnapshots: collectSnaphots}
 }
 
 // Collect implements Prometheus Collector interface
@@ -78,19 +80,18 @@ func (c *VmCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *VmCollector) retrieveMetrics() {
-	s := c.conn.SystemService().VmsService()
-	resp, err := s.List().Send()
+	v := Vms{}
+	err := c.client.GetAndParse("vms", &v)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	wg := &sync.WaitGroup{}
-	slice := resp.MustVms().Slice()
-	wg.Add(len(slice))
+	wg.Add(len(v.Vm))
 
 	ch := make(chan prometheus.Metric)
-	for _, v := range slice {
+	for _, v := range v.Vm {
 		go c.collectForVm(v, ch, wg)
 	}
 
@@ -111,58 +112,59 @@ func (c *VmCollector) retrieveMetrics() {
 	}
 }
 
-func (c *VmCollector) collectForVm(vm ovirtsdk.Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *VmCollector) collectForVm(vm Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	v := &vm
-	l := []string{v.MustName(), c.hostName(v), cluster.Name(v.MustCluster(), c.conn)}
+	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.Id, c.client)}
 
 	ch <- c.upMetric(v, l)
 
 	c.collectCpuMetrics(v, ch, l)
 
-	if stats, ok := v.Statistics(); ok {
-		statistic.CollectStatisticMetrics(prefix, c.conn, stats, ch, labelNames, l)
-	}
+	statPath := fmt.Sprintf("vms/%s/statistics", vm.Id)
+	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
 
 	if c.collectSnapshots {
 		c.collectSnapshotMetrics(v, ch, l)
 	}
 }
 
-func (c *VmCollector) collectCpuMetrics(vm *ovirtsdk.Vm, ch chan<- prometheus.Metric, l []string) {
-	topo := vm.MustCpu().MustTopology()
-	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.MustCores()), l)
-	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.MustThreads()), l)
-	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.MustSockets()), l)
+func (c *VmCollector) collectCpuMetrics(vm *Vm, ch chan<- prometheus.Metric, l []string) {
+	topo := vm.Cpu.Topology
+	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l)
+	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l)
+	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l)
 }
 
-func (c *VmCollector) hostName(vm *ovirtsdk.Vm) string {
-	h, ok := vm.Host()
-	if !ok {
+func (c *VmCollector) hostName(vm *Vm) string {
+	if len(vm.Host.Id) == 0 {
 		return ""
 	}
 
-	return host.Name(h, c.conn)
+	return host.Name(vm.Host.Id, c.client)
 }
 
-func (c *VmCollector) upMetric(vm *ovirtsdk.Vm, labelValues []string) prometheus.Metric {
+func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {
 	var up float64
-	if vm.MustStatus() == "up" {
+	if vm.Status == "up" {
 		up = 1
 	}
 
 	return metric.MustCreate(upDesc, up, labelValues)
 }
 
-func (c *VmCollector) collectSnapshotMetrics(vm *ovirtsdk.Vm, ch chan<- prometheus.Metric, l []string) {
-	snaps, err := followSnapShots(vm.MustSnapshots(), c.conn)
+func (c *VmCollector) collectSnapshotMetrics(vm *Vm, ch chan<- prometheus.Metric, l []string) {
+	snaps := Snapshots{}
+	path := fmt.Sprintf("vms/%s/snapshots", vm.Id)
+
+	err := c.client.GetAndParse(path, &snaps)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
-	s := snaps.Slice()[1:]
+	s := snaps.Snapshot[1:]
 	ch <- metric.MustCreate(snapshotCount, float64(len(s)), l)
 
 	if len(s) == 0 {
@@ -170,8 +172,8 @@ func (c *VmCollector) collectSnapshotMetrics(vm *ovirtsdk.Vm, ch chan<- promethe
 	}
 
 	min := s[0]
-	ch <- metric.MustCreate(maxSnapshotAge, time.Since(min.MustDate()).Seconds(), l)
+	ch <- metric.MustCreate(maxSnapshotAge, time.Since(min.Date).Seconds(), l)
 
 	max := s[len(s)-1]
-	ch <- metric.MustCreate(minSnapshotAge, time.Since(max.MustDate()).Seconds(), l)
+	ch <- metric.MustCreate(minSnapshotAge, time.Since(max.Date).Seconds(), l)
 }

@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
-	"time"
 
+	"github.com/czerwonk/ovirt_exporter/api"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
-	"github.com/imjoey/go-ovirt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
@@ -57,7 +55,8 @@ func printVersion() {
 }
 
 func startServer() {
-	log.Infof("Starting oVirt exporter (Version: %s)\n", version)
+	log.Infof("Start"+
+		"deing oVirt exporter (Version: %s)\n", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
@@ -76,30 +75,11 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	conn, err := ovirtsdk.NewConnectionBuilder().
-		URL(strings.TrimRight(*apiUrl, "/")).
-		Username(*apiUser).
-		Password(*apiPass).
-		Insecure(*apiInsecureCert).
-		Timeout(5 * time.Minute).
-		Compress(true).
-		Build()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	defer conn.Close()
-
-	err = conn.Test()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
+	client := api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert, &PromLogger{})
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(conn, *withSnapshots))
-	reg.MustRegister(host.NewCollector(conn))
-	reg.MustRegister(storagedomain.NewCollector(conn))
+	reg.MustRegister(vm.NewCollector(client, *withSnapshots))
+	reg.MustRegister(host.NewCollector(client))
+	reg.MustRegister(storagedomain.NewCollector(client))
 
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),
