@@ -5,12 +5,12 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/api"
+	"github.com/czerwonk/ovirt_api"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func CollectMetrics(path, prefix string, labelNames, labelValues []string, client *api.ApiClient, ch chan<- prometheus.Metric) error {
+func CollectMetrics(path, prefix string, labelNames, labelValues []string, client *ovirt_api.ApiClient, ch chan<- prometheus.Metric) error {
 	stats := Statistics{}
 	err := client.GetAndParse(path, &stats)
 	if err != nil {

@@ -5,7 +5,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/api"
+	"github.com/czerwonk/ovirt_api"
 	"github.com/prometheus/common/log"
 )
 
@@ -14,7 +14,7 @@ var (
 	nameCache  = make(map[string]string)
 )
 
-func Get(id string, client *api.ApiClient) (*Cluster, error) {
+func Get(id string, client *ovirt_api.ApiClient) (*Cluster, error) {
 	path := fmt.Sprintf("clusters/%s", id)
 
 	c := Cluster{}
@@ -26,7 +26,7 @@ func Get(id string, client *api.ApiClient) (*Cluster, error) {
 	return &c, nil
 }
 
-func Name(id string, client *api.ApiClient) string {
+func Name(id string, client *ovirt_api.ApiClient) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 

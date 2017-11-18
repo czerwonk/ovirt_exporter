@@ -21,6 +21,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/czerwonk/ovirt_api"
+  packages = ["."]
+  revision = "c47805a039b957a91e609f64900aea3ec43ae25b"
+
+[[projects]]
+  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   revision = "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
@@ -82,6 +88,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a6cebbe049ed9f30fbcbc092e916b2f4c9deda42c90b933dbe9c4872524d3880"
+  inputs-digest = "c6dceb281d38862dd7e11df31dfcef039071702d6c21b046884ade48c9455c21"
   solver-name = "gps-cdcl"
   solver-version = 1

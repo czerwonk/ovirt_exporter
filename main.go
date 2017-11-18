@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/czerwonk/ovirt_exporter/api"
+	"github.com/czerwonk/ovirt_api"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
@@ -75,7 +75,14 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	client := api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert, &PromLogger{})
+	client, err := ovirt_api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert, &PromLogger{})
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	defer client.Close()
+
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(vm.NewCollector(client, *withSnapshots))
 	reg.MustRegister(host.NewCollector(client))
