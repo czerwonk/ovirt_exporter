@@ -75,13 +75,13 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	client, err := ovirt_api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert, &PromLogger{})
+	client, err := ovirt_api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert)
 	if err != nil {
 		log.Error(err)
 		return
 	}
-
 	defer client.Close()
+	client.Logger = &PromLogger{}
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(vm.NewCollector(client, *withSnapshots))

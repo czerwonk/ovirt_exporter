@@ -20,16 +20,17 @@ type ApiClient struct {
 	Password string
 	Logger   Logger
 	Debug    bool
-	coockie  string
+	cookie  string
 	client   *http.Client
 }
 
 // NewClient returns a new client
-func NewClient(url, username, password string, insecureCert bool, logger Logger) (*ApiClient, error) {
+func NewClient(url, username, password string, insecureCert bool) (*ApiClient, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureCert},
 	}
 	c := &http.Client{Transport: tr}
+	logger := &DefaultLogger{}
 
 	client := &ApiClient{Url: url, Username: username, Password: password, client: c, Logger: logger}
 	err := client.Auth()
@@ -49,12 +50,15 @@ func (c *ApiClient) Auth() error {
 	req.SetBasicAuth(c.Username, c.Password)
 	req.Header.Set("Prefer", "persistent-auth")
 	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
 
 	if resp.StatusCode != 200 {
 		return errors.New(resp.Status)
 	}
 
-	c.coockie = strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
+	c.cookie = strings.Split(resp.Header.Get("Set-Cookie"), ";")[0]
 	return nil
 }
 
@@ -99,7 +103,7 @@ func (c *ApiClient) SendRequest(path, method string, body io.Reader) ([]byte, er
 
 	req.Header.Add("Content-Type", "application/xml")
 	req.Header.Set("Prefer", "persistent-auth")
-	req.Header.Set("Cookie", c.coockie)
+	req.Header.Set("Cookie", c.cookie)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
