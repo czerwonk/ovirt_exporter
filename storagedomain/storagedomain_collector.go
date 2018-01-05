@@ -23,7 +23,7 @@ func init() {
 	l := []string{"name", "type", "path"}
 	availableDesc = prometheus.NewDesc(prefix+"available_bytes", "Available space in bytes", l, nil)
 	usedDesc = prometheus.NewDesc(prefix+"used_bytes", "Used space in bytes", l, nil)
-	commitedDesc = prometheus.NewDesc(prefix+"commited_bytes", "Commited space in bytes", l, nil)
+	commitedDesc = prometheus.NewDesc(prefix+"commited_bytes", "Committed space in bytes", l, nil)
 	upDesc = prometheus.NewDesc(prefix+"up", "Status of storage domain", l, nil)
 	masterDesc = prometheus.NewDesc(prefix+"master", "Storage domain is master", l, nil)
 }
