@@ -20,7 +20,7 @@ func CollectMetrics(path, prefix string, labelNames, labelValues []string, clien
 	}
 
 	for _, s := range stats.Statistic {
-		if s.Kind == "gauge" {
+		if s.Kind == "gauge" || s.Kind == "counter" {
 			ch <- convertToMetric(s, prefix, labelNames, labelValues)
 		}
 	}
