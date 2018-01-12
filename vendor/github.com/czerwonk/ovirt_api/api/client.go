@@ -1,4 +1,4 @@
-package ovirt_api
+package api
 
 import (
 	"crypto/tls"
@@ -13,26 +13,26 @@ import (
 	"io"
 )
 
-// ApiClient encapsulates communication with the oVirt REST API
-type ApiClient struct {
-	Url      string
+// Client encapsulates communication with the oVirt REST API
+type Client struct {
+	URL      string
 	Username string
 	Password string
 	Logger   Logger
 	Debug    bool
-	cookie  string
+	cookie   string
 	client   *http.Client
 }
 
 // NewClient returns a new client
-func NewClient(url, username, password string, insecureCert bool) (*ApiClient, error) {
+func NewClient(url, username, password string, insecureCert bool) (*Client, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureCert},
 	}
 	c := &http.Client{Transport: tr}
 	logger := &DefaultLogger{}
 
-	client := &ApiClient{Url: url, Username: username, Password: password, client: c, Logger: logger}
+	client := &Client{URL: url, Username: username, Password: password, client: c, Logger: logger}
 	err := client.Auth()
 	if err != nil {
 		return nil, err
@@ -41,8 +41,9 @@ func NewClient(url, username, password string, insecureCert bool) (*ApiClient, e
 	return client, nil
 }
 
-func (c *ApiClient) Auth() error {
-	req, err := http.NewRequest("HEAD", c.Url, nil)
+// Auth establishes a SSO session with oVirt API
+func (c *Client) Auth() error {
+	req, err := http.NewRequest("HEAD", c.URL, nil)
 	if err != nil {
 		return err
 	}
@@ -63,17 +64,18 @@ func (c *ApiClient) Auth() error {
 }
 
 // GetAndParse retrieves XML data from the API and unmarshals it
-func (c *ApiClient) GetAndParse(path string, v interface{}) error {
+func (c *Client) GetAndParse(path string, v interface{}) error {
 	return c.SendAndParse(path, "GET", v, nil)
 }
 
 // Get retrieves XML data from the API and returns it
-func (c *ApiClient) Get(path string) ([]byte, error) {
+func (c *Client) Get(path string) ([]byte, error) {
 	return c.SendRequest(path, "GET", nil)
 }
 
-func (c *ApiClient) Close() {
-	req, err := http.NewRequest("HEAD", c.Url, nil)
+// Close terminates the SSO session with the API
+func (c *Client) Close() {
+	req, err := http.NewRequest("HEAD", c.URL, nil)
 	if err != nil {
 		return
 	}
@@ -82,7 +84,8 @@ func (c *ApiClient) Close() {
 	c.client.Do(req)
 }
 
-func (c *ApiClient) SendAndParse(path, method string, res interface{}, body io.Reader) error {
+// SendAndParse sends a request to the API and unmarshalls the response
+func (c *Client) SendAndParse(path, method string, res interface{}, body io.Reader) error {
 	b, err := c.SendRequest(path, method, body)
 	if err != nil {
 		return err
@@ -92,8 +95,9 @@ func (c *ApiClient) SendAndParse(path, method string, res interface{}, body io.R
 	return err
 }
 
-func (c *ApiClient) SendRequest(path, method string, body io.Reader) ([]byte, error) {
-	uri := strings.Trim(c.Url, "/") + "/" + strings.Trim(path, "/")
+// SendRequest sends a request to the API
+func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error) {
+	uri := strings.Trim(c.URL, "/") + "/" + strings.Trim(path, "/")
 	c.Logger.Debug(method, uri)
 
 	req, err := http.NewRequest(method, uri, body)
