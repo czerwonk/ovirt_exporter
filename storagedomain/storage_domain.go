@@ -5,7 +5,7 @@ type StorageDomains struct {
 }
 
 type StorageDomain struct {
-	Id      string `xml:"id,attr"`
+	ID      string `xml:"id,attr"`
 	Name    string `xml:"name"`
 	Storage struct {
 		Path string `xml:"path"`
@@ -19,7 +19,7 @@ type StorageDomain struct {
 	Master         bool    `xml:"master"`
 	DataCenters    struct {
 		DataCenter struct {
-			Id string `xml:"id,attr"`
+			ID string `xml:"id,attr"`
 		} `xml:"data_center"`
 	} `xml:"data_centers"`
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.7.0"
+const version string = "0.8.0"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -26,6 +26,8 @@ var (
 	apiPass         = flag.String("api.password", "", "API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
 	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
+	withNetwork     = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
+	debug           = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
 )
 
 func init() {
@@ -80,11 +82,12 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer client.Close()
+	client.Debug = *debug
 	client.Logger = &PromLogger{}
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client, *withSnapshots))
-	reg.MustRegister(host.NewCollector(client))
+	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork))
+	reg.MustRegister(host.NewCollector(client, *withNetwork))
 	reg.MustRegister(storagedomain.NewCollector(client))
 
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{

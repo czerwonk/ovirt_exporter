@@ -8,14 +8,15 @@ import (
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 )
 
 // CollectMetrics collects metrics by statics returned by a given url
-func CollectMetrics(path, prefix string, labelNames, labelValues []string, client *api.Client, ch chan<- prometheus.Metric) error {
+func CollectMetrics(path, prefix string, labelNames, labelValues []string, client *api.Client, ch chan<- prometheus.Metric) {
 	stats := Statistics{}
 	err := client.GetAndParse(path, &stats)
 	if err != nil {
-		return err
+		log.Errorln(err)
 	}
 
 	for _, s := range stats.Statistic {
@@ -23,7 +24,6 @@ func CollectMetrics(path, prefix string, labelNames, labelValues []string, clien
 			ch <- convertToMetric(s, prefix, labelNames, labelValues)
 		}
 	}
-	return nil
 }
 
 func convertToMetric(s Statistic, prefix string, labelNames, labelValues []string) prometheus.Metric {

@@ -11,6 +11,7 @@ import (
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/metric"
+	"github.com/czerwonk/ovirt_exporter/network"
 	"github.com/czerwonk/ovirt_exporter/statistic"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -40,34 +41,35 @@ func init() {
 	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_minutes", "Age of the newest snapshot in minutes", labelNames, nil)
 }
 
-// VmCollector collects virtual machine statistics from oVirt
-type VmCollector struct {
+// VMCollector collects virtual machine statistics from oVirt
+type VMCollector struct {
 	client           *api.Client
 	metrics          []prometheus.Metric
 	collectSnapshots bool
+	collectNetwork   bool
 	mutex            sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectSnaphots bool) prometheus.Collector {
-	return &VmCollector{client: client, collectSnapshots: collectSnaphots}
+func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool) prometheus.Collector {
+	return &VMCollector{client: client, collectSnapshots: collectSnaphots, collectNetwork: collectNetwork}
 }
 
 // Collect implements Prometheus Collector interface
-func (c *VmCollector) Collect(ch chan<- prometheus.Metric) {
+func (c *VMCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, m := range c.getMetrics() {
 		ch <- m
 	}
 }
 
 // Describe implements Prometheus Collector interface
-func (c *VmCollector) Describe(ch chan<- *prometheus.Desc) {
+func (c *VMCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, m := range c.getMetrics() {
 		ch <- m.Desc()
 	}
 }
 
-func (c *VmCollector) getMetrics() []prometheus.Metric {
+func (c *VMCollector) getMetrics() []prometheus.Metric {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -79,8 +81,8 @@ func (c *VmCollector) getMetrics() []prometheus.Metric {
 	return c.metrics
 }
 
-func (c *VmCollector) retrieveMetrics() {
-	v := Vms{}
+func (c *VMCollector) retrieveMetrics() {
+	v := VMs{}
 	err := c.client.GetAndParse("vms", &v)
 	if err != nil {
 		log.Error(err)
@@ -88,11 +90,11 @@ func (c *VmCollector) retrieveMetrics() {
 	}
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(v.Vm))
+	wg.Add(len(v.VMs))
 
 	ch := make(chan prometheus.Metric)
-	for _, v := range v.Vm {
-		go c.collectForVm(v, ch, wg)
+	for _, v := range v.VMs {
+		go c.collectForVM(v, ch, wg)
 	}
 
 	done := make(chan bool)
@@ -112,40 +114,45 @@ func (c *VmCollector) retrieveMetrics() {
 	}
 }
 
-func (c *VmCollector) collectForVm(vm Vm, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *VMCollector) collectForVM(vm VM, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	v := &vm
-	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.Id, c.client)}
+	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.ID, c.client)}
 
 	ch <- c.upMetric(v, l)
 
-	c.collectCpuMetrics(v, ch, l)
+	c.collectCPUMetrics(v, ch, l)
 
-	statPath := fmt.Sprintf("vms/%s/statistics", vm.Id)
+	statPath := fmt.Sprintf("vms/%s/statistics", vm.ID)
 	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
+
+	if c.collectNetwork {
+		networkPath := fmt.Sprintf("vms/%s/nics", vm.ID)
+		network.CollectMetricsForVM(networkPath, prefix, labelNames, l, c.client, ch)
+	}
 
 	if c.collectSnapshots {
 		c.collectSnapshotMetrics(v, ch, l)
 	}
 }
 
-func (c *VmCollector) collectCpuMetrics(vm *Vm, ch chan<- prometheus.Metric, l []string) {
-	topo := vm.Cpu.Topology
+func (c *VMCollector) collectCPUMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
+	topo := vm.CPU.Topology
 	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l)
 	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l)
 	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l)
 }
 
-func (c *VmCollector) hostName(vm *Vm) string {
-	if len(vm.Host.Id) == 0 {
+func (c *VMCollector) hostName(vm *VM) string {
+	if len(vm.Host.ID) == 0 {
 		return ""
 	}
 
-	return host.Name(vm.Host.Id, c.client)
+	return host.Name(vm.Host.ID, c.client)
 }
 
-func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {
+func (c *VMCollector) upMetric(vm *VM, labelValues []string) prometheus.Metric {
 	var up float64
 	if vm.Status == "up" {
 		up = 1
@@ -154,9 +161,9 @@ func (c *VmCollector) upMetric(vm *Vm, labelValues []string) prometheus.Metric {
 	return metric.MustCreate(upDesc, up, labelValues)
 }
 
-func (c *VmCollector) collectSnapshotMetrics(vm *Vm, ch chan<- prometheus.Metric, l []string) {
+func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
 	snaps := Snapshots{}
-	path := fmt.Sprintf("vms/%s/snapshots", vm.Id)
+	path := fmt.Sprintf("vms/%s/snapshots", vm.ID)
 
 	err := c.client.GetAndParse(path, &snaps)
 	if err != nil {
