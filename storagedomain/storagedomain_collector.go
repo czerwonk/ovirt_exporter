@@ -3,7 +3,7 @@ package storagedomain
 import (
 	"sync"
 
-	"github.com/czerwonk/ovirt_api"
+	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -30,11 +30,11 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	client *ovirt_api.ApiClient
+	client *api.Client
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *ovirt_api.ApiClient) prometheus.Collector {
+func NewCollector(client *api.Client) prometheus.Collector {
 	return &StorageDomainCollector{client: client}
 }
 

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/czerwonk/ovirt_api"
+	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
@@ -21,7 +21,7 @@ var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
 	listenAddress   = flag.String("web.listen-address", ":9325", "Address on which to expose metrics and web interface.")
 	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	apiUrl          = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
+	apiURL          = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
 	apiUser         = flag.String("api.username", "user@internal", "API username")
 	apiPass         = flag.String("api.password", "", "API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
@@ -55,8 +55,7 @@ func printVersion() {
 }
 
 func startServer() {
-	log.Infof("Start"+
-		"deing oVirt exporter (Version: %s)\n", version)
+	log.Infof("Starting oVirt exporter (Version: %s)\n", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
@@ -75,7 +74,7 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	client, err := ovirt_api.NewClient(*apiUrl, *apiUser, *apiPass, *apiInsecureCert)
+	client, err := api.NewClient(*apiURL, *apiUser, *apiPass, *apiInsecureCert)
 	if err != nil {
 		log.Error(err)
 		return

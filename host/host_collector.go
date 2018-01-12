@@ -5,7 +5,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_api"
+	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/czerwonk/ovirt_exporter/statistic"
@@ -37,13 +37,13 @@ func init() {
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	client  *ovirt_api.ApiClient
+	client  *api.Client
 	metrics []prometheus.Metric
 	mutex   sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *ovirt_api.ApiClient) prometheus.Collector {
+func NewCollector(client *api.Client) prometheus.Collector {
 	return &HostCollector{client: client}
 }
 

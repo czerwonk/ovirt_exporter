@@ -7,7 +7,7 @@ import (
 
 	"time"
 
-	"github.com/czerwonk/ovirt_api"
+	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/metric"
@@ -42,14 +42,14 @@ func init() {
 
 // VmCollector collects virtual machine statistics from oVirt
 type VmCollector struct {
-	client           *ovirt_api.ApiClient
+	client           *api.Client
 	metrics          []prometheus.Metric
 	collectSnapshots bool
 	mutex            sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *ovirt_api.ApiClient, collectSnaphots bool) prometheus.Collector {
+func NewCollector(client *api.Client, collectSnaphots bool) prometheus.Collector {
 	return &VmCollector{client: client, collectSnapshots: collectSnaphots}
 }
 
