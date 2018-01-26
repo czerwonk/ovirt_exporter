@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/czerwonk/ovirt_api"
   packages = ["api"]
-  revision = "2fb93b9160cd56ea3f21e806c9a809694bc94db7"
+  revision = "d68518deb2a4344f0807cb2c3eaa2d42f3f3bcd9"
 
 [[projects]]
   branch = "master"

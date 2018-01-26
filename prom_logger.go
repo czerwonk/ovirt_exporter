@@ -7,16 +7,16 @@ type PromLogger struct {
 }
 
 // Infof logs info messages
-func (l *PromLogger) Infof(format string, args ...string) {
+func (l *PromLogger) Infof(format string, args ...interface{}) {
 	log.Infof(format, args)
 }
 
 // Debugf logs debug messages
-func (l *PromLogger) Debugf(format string, args ...string) {
+func (l *PromLogger) Debugf(format string, args ...interface{}) {
 	log.Debugf(format, args)
 }
 
 // Errorf logs errors
-func (l *PromLogger) Errorf(format string, args ...string) {
+func (l *PromLogger) Errorf(format string, args ...interface{}) {
 	log.Errorf(format, args)
 }
