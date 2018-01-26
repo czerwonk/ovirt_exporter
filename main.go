@@ -76,14 +76,22 @@ func startServer() {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
-	client, err := api.NewClient(*apiURL, *apiUser, *apiPass, *apiInsecureCert)
+	opts := []api.ClientOption{api.WithLogger(&PromLogger{})}
+
+	if *debug {
+		opts = append(opts, api.WithDebug())
+	}
+
+	if *apiInsecureCert {
+		opts = append(opts, api.WithInsecure())
+	}
+
+	client, err := api.NewClient(*apiURL, *apiUser, *apiPass, opts...)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	defer client.Close()
-	client.Debug = *debug
-	client.Logger = &PromLogger{}
 
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork))

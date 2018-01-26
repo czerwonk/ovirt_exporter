@@ -6,17 +6,17 @@ import "github.com/prometheus/common/log"
 type PromLogger struct {
 }
 
-// Info logs info messages
-func (l *PromLogger) Info(args ...string) {
-	log.Info(args)
+// Infof logs info messages
+func (l *PromLogger) Infof(format string, args ...string) {
+	log.Infof(format, args)
 }
 
-// Debug logs debug messages
-func (l *PromLogger) Debug(args ...string) {
-	log.Debug(args)
+// Debugf logs debug messages
+func (l *PromLogger) Debugf(format string, args ...string) {
+	log.Debugf(format, args)
 }
 
-// Error logs errors
-func (l *PromLogger) Error(args ...string) {
-	log.Error(args)
+// Errorf logs errors
+func (l *PromLogger) Errorf(format string, args ...string) {
+	log.Errorf(format, args)
 }

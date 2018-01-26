@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/xml"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 
@@ -15,24 +14,56 @@ import (
 
 // Client encapsulates communication with the oVirt REST API
 type Client struct {
-	URL      string
-	Username string
-	Password string
-	Logger   Logger
-	Debug    bool
+	url      string
+	username string
+	password string
+	logger   Logger
+	debug    bool
 	cookie   string
 	client   *http.Client
 }
 
-// NewClient returns a new client
-func NewClient(url, username, password string, insecureCert bool) (*Client, error) {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureCert},
-	}
-	c := &http.Client{Transport: tr}
-	logger := &DefaultLogger{}
+// ClientOption applies options to Client
+type ClientOption func(*Client)
 
-	client := &Client{URL: url, Username: username, Password: password, client: c, Logger: logger}
+// WithInsecure disables TLS certificate validation
+func WithInsecure() ClientOption {
+	return func(c *Client) {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		c.client = &http.Client{Transport: tr}
+	}
+}
+
+// WithLogger sets the logger for the API client
+func WithLogger(l Logger) ClientOption {
+	return func(c *Client) {
+		c.logger = l
+	}
+}
+
+// WithDebug enables debug mode
+func WithDebug() ClientOption {
+	return func(c *Client) {
+		c.debug = true
+	}
+}
+
+// NewClient returns a new client
+func NewClient(url, username, password string, opts ...ClientOption) (*Client, error) {
+	client := &Client{
+		url:      url,
+		username: username,
+		password: password,
+		client:   &http.Client{},
+		logger:   &defaultLogger{},
+	}
+
+	for _, o := range opts {
+		o(client)
+	}
+
 	err := client.Auth()
 	if err != nil {
 		return nil, err
@@ -43,12 +74,12 @@ func NewClient(url, username, password string, insecureCert bool) (*Client, erro
 
 // Auth establishes a SSO session with oVirt API
 func (c *Client) Auth() error {
-	req, err := http.NewRequest("HEAD", c.URL, nil)
+	req, err := http.NewRequest("HEAD", c.url, nil)
 	if err != nil {
 		return err
 	}
 
-	req.SetBasicAuth(c.Username, c.Password)
+	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Prefer", "persistent-auth")
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -75,12 +106,12 @@ func (c *Client) Get(path string) ([]byte, error) {
 
 // Close terminates the SSO session with the API
 func (c *Client) Close() {
-	req, err := http.NewRequest("HEAD", c.URL, nil)
+	req, err := http.NewRequest("HEAD", c.url, nil)
 	if err != nil {
 		return
 	}
 
-	req.SetBasicAuth(c.Username, c.Password)
+	req.SetBasicAuth(c.username, c.password)
 	c.client.Do(req)
 }
 
@@ -97,8 +128,8 @@ func (c *Client) SendAndParse(path, method string, res interface{}, body io.Read
 
 // SendRequest sends a request to the API
 func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error) {
-	uri := strings.Trim(c.URL, "/") + "/" + strings.Trim(path, "/")
-	c.Logger.Debug(method, uri)
+	uri := strings.Trim(c.url, "/") + "/" + strings.Trim(path, "/")
+	c.logger.Debugf("%s %s", method, uri)
 
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
@@ -124,9 +155,9 @@ func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error
 		return nil, err
 	}
 
-	log.Println(resp.Status)
-	if c.Debug {
-		c.Logger.Debug(string(b))
+	c.logger.Debugf("Status Code: %s", resp.Status)
+	if c.debug {
+		c.logger.Debugf("Response: %s", string(b))
 	}
 
 	return b, err
