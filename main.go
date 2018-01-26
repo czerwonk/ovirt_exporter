@@ -57,7 +57,7 @@ func printVersion() {
 }
 
 func startServer() {
-	log.Infof("Starting oVirt exporter (Version: %s)\n", version)
+	log.Infof("Starting oVirt exporter (Version: %s)", version)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
@@ -71,7 +71,7 @@ func startServer() {
 	})
 	http.HandleFunc(*metricsPath, handleMetricsRequest)
 
-	log.Infof("Listening for %s on %s\n", *metricsPath, *listenAddress)
+	log.Infof("Listening for %s on %s", *metricsPath, *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
