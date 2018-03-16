@@ -144,12 +144,12 @@ func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
 		return nil, fmt.Errorf(resp.Status)
 	}
 
-	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
