@@ -26,7 +26,7 @@
   branch = "master"
   name = "github.com/czerwonk/ovirt_api"
   packages = ["api"]
-  revision = "377f5f9444966c3e083d817a2ed0b9971d5eaada"
+  revision = "fbcfe973d642220a34308a2569adb780dc54f014"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -87,7 +87,7 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "b4956d363a8b14623cc81db401707679605930a3"
+  revision = "80db560fac1fb3e6ac81dbc7f8ae4c061f5257bd"
 
 [[projects]]
   branch = "master"
@@ -98,7 +98,7 @@
     "windows/registry",
     "windows/svc/eventlog"
   ]
-  revision = "cc7307a45468e49eaf2997c890f14aa03a26917b"
+  revision = "bb729a57828d76e3050e664d86aa052741ab620f"
 
 [[projects]]
   name = "gopkg.in/alecthomas/kingpin.v2"
