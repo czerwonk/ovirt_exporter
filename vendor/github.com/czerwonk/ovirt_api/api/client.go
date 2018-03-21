@@ -133,7 +133,7 @@ func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error
 
 func (c *Client) sendRequest(path, method string, body io.Reader, reauth bool) ([]byte, error) {
 	uri := strings.Trim(c.url, "/") + "/" + strings.Trim(path, "/")
-	c.logger.Debugf("%s %s", method, uri)
+	c.logger.Debugf("%s", method, uri)
 
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {

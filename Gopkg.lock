@@ -26,7 +26,7 @@
   branch = "master"
   name = "github.com/czerwonk/ovirt_api"
   packages = ["api"]
-  revision = "fbcfe973d642220a34308a2569adb780dc54f014"
+  revision = "63e3f014686cc5c23c6d2dbcdb95cc2d3351ff99"
 
 [[projects]]
   name = "github.com/golang/protobuf"
