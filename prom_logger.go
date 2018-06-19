@@ -13,7 +13,9 @@ func (l *PromLogger) Infof(format string, args ...interface{}) {
 
 // Debugf logs debug messages
 func (l *PromLogger) Debugf(format string, args ...interface{}) {
-	log.Debugf(format, args)
+	if *debug {
+		log.Debugf(format, args)
+	}
 }
 
 // Errorf logs errors
