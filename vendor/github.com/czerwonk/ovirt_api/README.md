@@ -4,9 +4,6 @@
 
 API connector for oVirt (used by oSnap, ovirt-zero-touch)
 
-## Remarks
-this is an early version
-
 ## Install
 ```
 go get -u github.com/czerwonk/ovirt_api

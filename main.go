@@ -15,7 +15,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.8.1"
+const version string = "0.8.3"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -58,6 +58,7 @@ func printVersion() {
 
 func startServer() {
 	log.Infof("Starting oVirt exporter (Version: %s)", version)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
@@ -69,13 +70,22 @@ func startServer() {
 			</body>
 			</html>`))
 	})
-	http.HandleFunc(*metricsPath, handleMetricsRequest)
+
+	client, err := connectAPI()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	http.HandleFunc(*metricsPath, func(w http.ResponseWriter, r *http.Request) {
+		handleMetricsRequest(w, r, client)
+	})
 
 	log.Infof("Listening for %s on %s", *metricsPath, *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
-func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
+func connectAPI() (*api.Client, error) {
 	opts := []api.ClientOption{api.WithLogger(&PromLogger{})}
 
 	if *debug {
@@ -88,11 +98,13 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 
 	client, err := api.NewClient(*apiURL, *apiUser, *apiPass, opts...)
 	if err != nil {
-		log.Error(err)
-		return
+		return nil, err
 	}
-	defer client.Close()
 
+	return client, err
+}
+
+func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork))
 	reg.MustRegister(host.NewCollector(client, *withNetwork))

@@ -128,8 +128,12 @@ func (c *Client) SendAndParse(path, method string, res interface{}, body io.Read
 
 // SendRequest sends a request to the API
 func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error) {
+	return c.sendRequest(path, method, body, true)
+}
+
+func (c *Client) sendRequest(path, method string, body io.Reader, reauth bool) ([]byte, error) {
 	uri := strings.Trim(c.url, "/") + "/" + strings.Trim(path, "/")
-	c.logger.Debugf("%s %s", method, uri)
+	c.logger.Debugf("%s", method, uri)
 
 	req, err := http.NewRequest(method, uri, body)
 	if err != nil {
@@ -144,12 +148,19 @@ func (c *Client) SendRequest(path, method string, body io.Reader) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 && reauth {
+		err := c.Auth()
+		if err == nil {
+			return c.sendRequest(path, method, body, false)
+		}
+	}
 
 	if resp.StatusCode >= 300 {
 		return nil, fmt.Errorf(resp.Status)
 	}
 
-	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
