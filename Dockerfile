@@ -9,8 +9,7 @@ ENV WITH_SNAPSHOTS false
 ENV WITH_NETWORK true
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
-COPY --from=builder /go/src/github.com/czerwonk/ovirt_exporter/app junos_exporter
-COPY --from=builder /go/bin/ovirt_exporter .
+COPY --from=builder /go/src/github.com/czerwonk/ovirt_exporter/app ovirt_exporter
 
 CMD ./ovirt_exporter -api.url=$API_URL -api.username=$API_USER -api.password=$API_PASS -api.insecure-cert=$API_INSECURE -with-snapshots=$WITH_SNAPSHOTS -with-network=$WITH_NETWORK
 
