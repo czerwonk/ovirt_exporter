@@ -1,4 +1,3 @@
 language: go
 go:
-  - 1.8
-script: make init test vet lint
+  - "1.11"
