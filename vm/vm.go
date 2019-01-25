@@ -21,4 +21,5 @@ type VM struct {
 			Threads int `xml:"threads"`
 		} `xml:"topology"`
 	} `xml:"cpu"`
+	HasIllegalImages bool `json:"has_illegal_images"`
 }
