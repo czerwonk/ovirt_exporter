@@ -20,15 +20,15 @@ import (
 const prefix = "ovirt_vm_"
 
 var (
-	upDesc           *prometheus.Desc
-	cpuCoresDesc     *prometheus.Desc
-	cpuSocketsDesc   *prometheus.Desc
-	cpuThreadsDesc   *prometheus.Desc
-	snapshotCount    *prometheus.Desc
-	minSnapshotAge   *prometheus.Desc
-	maxSnapshotAge   *prometheus.Desc
-	diskImageIllegal *prometheus.Desc
-	labelNames       []string
+	upDesc         *prometheus.Desc
+	cpuCoresDesc   *prometheus.Desc
+	cpuSocketsDesc *prometheus.Desc
+	cpuThreadsDesc *prometheus.Desc
+	snapshotCount  *prometheus.Desc
+	minSnapshotAge *prometheus.Desc
+	maxSnapshotAge *prometheus.Desc
+	illegalImages  *prometheus.Desc
+	labelNames     []string
 )
 
 func init() {
@@ -40,7 +40,7 @@ func init() {
 	snapshotCount = prometheus.NewDesc(prefix+"snapshot_count", "Number of snapshots", labelNames, nil)
 	maxSnapshotAge = prometheus.NewDesc(prefix+"snapshot_max_age_minutes", "Age of the oldest snapshot in minutes", labelNames, nil)
 	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_minutes", "Age of the newest snapshot in minutes", labelNames, nil)
-	diskImageIllegal = prometheus.NewDesc(prefix+"disk_image_illegal", "Health status of the disks attatched to the VM (1 if one or more disk is in illegal state)", labelNames, nil)
+	illegalImages = prometheus.NewDesc(prefix+"illegal_images", "Health status of the disks attatched to the VM (1 if one or more disk is in illegal state)", labelNames, nil)
 }
 
 // VMCollector collects virtual machine statistics from oVirt
@@ -170,7 +170,7 @@ func (c *VMCollector) diskImageIllegalMetric(vm *VM, labelValues []string) prome
 		hasIllegalImages = 1
 	}
 
-	return metric.MustCreate(diskImageIllegal, hasIllegalImages, labelValues)
+	return metric.MustCreate(illegalImages, hasIllegalImages, labelValues)
 }
 
 func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
