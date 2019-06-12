@@ -28,16 +28,20 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	client *api.Client
+	client          *api.Client
+	collectDuration prometheus.Observer
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client) prometheus.Collector {
-	return &StorageDomainCollector{client: client}
+func NewCollector(client *api.Client, collectDuration prometheus.Observer) prometheus.Collector {
+	return &StorageDomainCollector{client: client, collectDuration: collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
+	timer := prometheus.NewTimer(c.collectDuration)
+	defer timer.ObserveDuration()
+
 	s := StorageDomains{}
 	err := c.client.GetAndParse("storagedomains", &s)
 	if err != nil {

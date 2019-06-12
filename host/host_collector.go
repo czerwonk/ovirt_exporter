@@ -37,15 +37,16 @@ func init() {
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	client         *api.Client
-	metrics        []prometheus.Metric
-	collectNetwork bool
-	mutex          sync.Mutex
+	client          *api.Client
+	collectDuration prometheus.Observer
+	metrics         []prometheus.Metric
+	collectNetwork  bool
+	mutex           sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectNetwork bool) prometheus.Collector {
-	return &HostCollector{client: client, collectNetwork: collectNetwork}
+func NewCollector(client *api.Client, collectNetwork bool, collectDuration prometheus.Observer) prometheus.Collector {
+	return &HostCollector{client: client, collectNetwork: collectNetwork, collectDuration: collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
@@ -75,6 +76,9 @@ func (c *HostCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *HostCollector) retrieveMetrics() {
+	timer := prometheus.NewTimer(c.collectDuration)
+	defer timer.ObserveDuration()
+
 	h := Hosts{}
 	err := c.client.GetAndParse("hosts", &h)
 	if err != nil {
