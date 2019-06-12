@@ -91,20 +91,13 @@ func (c *HostCollector) retrieveMetrics() {
 		go c.collectForHost(h, ch, wg)
 	}
 
-	done := make(chan bool)
 	go func() {
 		wg.Wait()
-		done <- true
+		close(ch)
 	}()
 
-	for {
-		select {
-		case m := <-ch:
-			c.metrics = append(c.metrics, m)
-
-		case <-done:
-			return
-		}
+	for m := range ch {
+		c.metrics = append(c.metrics, m)
 	}
 }
 
