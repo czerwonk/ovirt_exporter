@@ -1,9 +1,8 @@
 package host
 
 import (
-	"sync"
-
 	"fmt"
+	"sync"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
