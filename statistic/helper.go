@@ -38,6 +38,7 @@ func convertToMetric(s Statistic, prefix string, labelNames, labelValues []strin
 	}
 
 	if valueType == prometheus.CounterValue {
+		// Suffix counter metrics with '_total' to follow Prometheus best practices.
 		metricName = strings.ReplaceAll(metricName, "_total", "")
 		metricName = metricName + "_total"
 	}
