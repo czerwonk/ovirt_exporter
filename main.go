@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/host"
@@ -23,7 +25,7 @@ var (
 	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	apiURL          = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
 	apiUser         = flag.String("api.username", "user@internal", "API username")
-	apiPass         = flag.String("api.password", "", "API password")
+	apiPassFile     = flag.String("api.password-file", "", "File containing the API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
 	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
 	withNetwork     = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
@@ -110,7 +112,13 @@ func connectAPI() (*api.Client, error) {
 		opts = append(opts, api.WithInsecure())
 	}
 
-	client, err := api.NewClient(*apiURL, *apiUser, *apiPass, opts...)
+	b, err := ioutil.ReadFile(*apiPassFile)
+	if err != nil {
+		return nil, err
+	}
+	apiPass := strings.Trim(string(b), "\n")
+
+	client, err := api.NewClient(*apiURL, *apiUser, apiPass, opts...)
 	if err != nil {
 		return nil, err
 	}
