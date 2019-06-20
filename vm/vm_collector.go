@@ -37,7 +37,7 @@ func init() {
 	cpuCoresDesc = prometheus.NewDesc(prefix+"cpu_cores", "Number of CPU cores assigned", labelNames, nil)
 	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
 	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
-	snapshotCount = prometheus.NewDesc(prefix+"snapshot_count", "Number of snapshots", labelNames, nil)
+	snapshotCount = prometheus.NewDesc(prefix+"snapshots", "Number of snapshots", labelNames, nil)
 	maxSnapshotAge = prometheus.NewDesc(prefix+"snapshot_max_age_seconds", "Age of the oldest snapshot in seconds", labelNames, nil)
 	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_seconds", "Age of the newest snapshot in seconds", labelNames, nil)
 	illegalImages = prometheus.NewDesc(prefix+"illegal_images", "Health status of the disks attatched to the VM (1 if one or more disk is in illegal state)", labelNames, nil)
@@ -46,6 +46,7 @@ func init() {
 // VMCollector collects virtual machine statistics from oVirt
 type VMCollector struct {
 	client           *api.Client
+	collectDuration  prometheus.Observer
 	metrics          []prometheus.Metric
 	collectSnapshots bool
 	collectNetwork   bool
@@ -53,8 +54,8 @@ type VMCollector struct {
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool) prometheus.Collector {
-	return &VMCollector{client: client, collectSnapshots: collectSnaphots, collectNetwork: collectNetwork}
+func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool, collectDuration prometheus.Observer) prometheus.Collector {
+	return &VMCollector{client: client, collectSnapshots: collectSnaphots, collectNetwork: collectNetwork, collectDuration: collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
@@ -84,6 +85,9 @@ func (c *VMCollector) getMetrics() []prometheus.Metric {
 }
 
 func (c *VMCollector) retrieveMetrics() {
+	timer := prometheus.NewTimer(c.collectDuration)
+	defer timer.ObserveDuration()
+
 	v := VMs{}
 	err := c.client.GetAndParse("vms", &v)
 	if err != nil {
@@ -99,20 +103,13 @@ func (c *VMCollector) retrieveMetrics() {
 		go c.collectForVM(v, ch, wg)
 	}
 
-	done := make(chan bool)
 	go func() {
 		wg.Wait()
-		done <- true
+		close(ch)
 	}()
 
-	for {
-		select {
-		case m := <-ch:
-			c.metrics = append(c.metrics, m)
-
-		case <-done:
-			return
-		}
+	for m := range ch {
+		c.metrics = append(c.metrics, m)
 	}
 }
 

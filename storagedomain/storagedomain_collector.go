@@ -1,8 +1,6 @@
 package storagedomain
 
 import (
-	"sync"
-
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,16 +28,20 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	client *api.Client
+	client          *api.Client
+	collectDuration prometheus.Observer
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client) prometheus.Collector {
-	return &StorageDomainCollector{client: client}
+func NewCollector(client *api.Client, collectDuration prometheus.Observer) prometheus.Collector {
+	return &StorageDomainCollector{client: client, collectDuration: collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
+	timer := prometheus.NewTimer(c.collectDuration)
+	defer timer.ObserveDuration()
+
 	s := StorageDomains{}
 	err := c.client.GetAndParse("storagedomains", &s)
 	if err != nil {
@@ -47,14 +49,9 @@ func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(len(s.Domains))
-
 	for _, h := range s.Domains {
-		go c.collectMetricsForDomain(h, ch, wg)
+		c.collectMetricsForDomain(h, ch)
 	}
-
-	wg.Wait()
 }
 
 // Describe implements Prometheus Collector interface
@@ -66,9 +63,7 @@ func (c *StorageDomainCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- committedDesc
 }
 
-func (c *StorageDomainCollector) collectMetricsForDomain(domain StorageDomain, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (c *StorageDomainCollector) collectMetricsForDomain(domain StorageDomain, ch chan<- prometheus.Metric) {
 	d := &domain
 	l := []string{d.Name, string(d.Type), d.Storage.Path}
 

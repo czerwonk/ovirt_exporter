@@ -30,6 +30,15 @@ var (
 	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
 	withNetwork     = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
 	debug           = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
+
+	collectorDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ovirt_collectors_duration",
+			Help:    "Histogram of latencies for metric collectors.",
+			Buckets: []float64{.1, .2, .4, 1, 3, 8, 20, 60},
+		},
+		[]string{"collector"},
+	)
 )
 
 func init() {
@@ -79,8 +88,13 @@ func startServer() {
 	}
 	defer client.Close()
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	reg.MustRegister(prometheus.NewGoCollector())
+	reg.MustRegister(collectorDuration)
+
 	http.HandleFunc(*metricsPath, func(w http.ResponseWriter, r *http.Request) {
-		handleMetricsRequest(w, r, client)
+		handleMetricsRequest(w, r, client, reg)
 	})
 
 	log.Infof("Listening for %s on %s", *metricsPath, *listenAddress)
@@ -112,13 +126,19 @@ func connectAPI() (*api.Client, error) {
 	return client, err
 }
 
-func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client) {
+func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client, appReg *prometheus.Registry) {
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork))
-	reg.MustRegister(host.NewCollector(client, *withNetwork))
-	reg.MustRegister(storagedomain.NewCollector(client))
+	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork, collectorDuration.WithLabelValues("vm")))
+	reg.MustRegister(host.NewCollector(client, *withNetwork, collectorDuration.WithLabelValues("host")))
+	reg.MustRegister(storagedomain.NewCollector(client, collectorDuration.WithLabelValues("storage")))
 
-	promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+	multiRegs := prometheus.Gatherers{
+		reg,
+		appReg,
+	}
+
+	promhttp.HandlerFor(multiRegs, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),
-		ErrorHandling: promhttp.ContinueOnError}).ServeHTTP(w, r)
+		ErrorHandling: promhttp.ContinueOnError,
+		Registry:      appReg}).ServeHTTP(w, r)
 }
