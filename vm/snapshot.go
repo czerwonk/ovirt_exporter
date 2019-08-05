@@ -2,12 +2,14 @@ package vm
 
 import "time"
 
+// Snapshots is a collection of snapshots
 type Snapshots struct {
 	Snapshot []Snapshot `xml:"snapshot"`
 }
 
+// Snapshot repesents the snapshot resource
 type Snapshot struct {
-	Id                 string    `xml:"id,attr"`
+	ID                 string    `xml:"id,attr"`
 	Description        string    `xml:"description"`
 	Date               time.Time `xml:"date"`
 	PersistMemorystate bool      `xml:"persist_memorystate"`

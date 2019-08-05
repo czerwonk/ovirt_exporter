@@ -1,9 +1,11 @@
 package statistic
 
+// Statistics is a collection of Statistics
 type Statistics struct {
 	Statistic []Statistic `xml:"statistic"`
 }
 
+// Statistic represents the statistic resource
 type Statistic struct {
 	Name        string `xml:"name"`
 	Description string `xml:"description"`

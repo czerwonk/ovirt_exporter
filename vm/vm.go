@@ -1,9 +1,11 @@
 package vm
 
+// VMs is a collection of virtual machines
 type VMs struct {
 	VMs []VM `xml:"vm"`
 }
 
+// VM represents the virutal machine resource
 type VM struct {
 	ID   string `xml:"id,attr"`
 	Name string `xml:"name"`

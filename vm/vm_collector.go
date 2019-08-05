@@ -9,6 +9,7 @@ import (
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
+	"github.com/czerwonk/ovirt_exporter/disk"
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/metric"
 	"github.com/czerwonk/ovirt_exporter/network"
@@ -20,15 +21,18 @@ import (
 const prefix = "ovirt_vm_"
 
 var (
-	upDesc         *prometheus.Desc
-	cpuCoresDesc   *prometheus.Desc
-	cpuSocketsDesc *prometheus.Desc
-	cpuThreadsDesc *prometheus.Desc
-	snapshotCount  *prometheus.Desc
-	minSnapshotAge *prometheus.Desc
-	maxSnapshotAge *prometheus.Desc
-	illegalImages  *prometheus.Desc
-	labelNames     []string
+	upDesc              *prometheus.Desc
+	cpuCoresDesc        *prometheus.Desc
+	cpuSocketsDesc      *prometheus.Desc
+	cpuThreadsDesc      *prometheus.Desc
+	snapshotCount       *prometheus.Desc
+	minSnapshotAge      *prometheus.Desc
+	maxSnapshotAge      *prometheus.Desc
+	illegalImages       *prometheus.Desc
+	diskProvisionedSize *prometheus.Desc
+	diskActualSize      *prometheus.Desc
+	diskTotalSize       *prometheus.Desc
+	labelNames          []string
 )
 
 func init() {
@@ -41,6 +45,12 @@ func init() {
 	maxSnapshotAge = prometheus.NewDesc(prefix+"snapshot_max_age_seconds", "Age of the oldest snapshot in seconds", labelNames, nil)
 	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_seconds", "Age of the newest snapshot in seconds", labelNames, nil)
 	illegalImages = prometheus.NewDesc(prefix+"illegal_images", "Health status of the disks attatched to the VM (1 if one or more disk is in illegal state)", labelNames, nil)
+
+	diskLabelNames := append(labelNames, "disk_name", "disk_alias", "disk_logical_name", "storage_domain")
+	diskProvisionedSize = prometheus.NewDesc(prefix+"disk_provisioned_size_bytes", "Provisioned size of the disk in bytes", diskLabelNames, nil)
+	diskActualSize = prometheus.NewDesc(prefix+"disk_actual_size_bytes", "Actual size of the disk in bytes", diskLabelNames, nil)
+	diskTotalSize = prometheus.NewDesc(prefix+"disk_total_size_bytes", "Total size of the disk in bytes", diskLabelNames, nil)
+
 }
 
 // VMCollector collects virtual machine statistics from oVirt
@@ -50,12 +60,18 @@ type VMCollector struct {
 	metrics          []prometheus.Metric
 	collectSnapshots bool
 	collectNetwork   bool
+	collectDisks     bool
 	mutex            sync.Mutex
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool, collectDuration prometheus.Observer) prometheus.Collector {
-	return &VMCollector{client: client, collectSnapshots: collectSnaphots, collectNetwork: collectNetwork, collectDuration: collectDuration}
+func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool, collectDisks bool, collectDuration prometheus.Observer) prometheus.Collector {
+	return &VMCollector{
+		client:           client,
+		collectSnapshots: collectSnaphots,
+		collectNetwork:   collectNetwork,
+		collectDisks:     collectDisks,
+		collectDuration:  collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
@@ -135,6 +151,10 @@ func (c *VMCollector) collectForVM(vm VM, ch chan<- prometheus.Metric, wg *sync.
 	if c.collectSnapshots {
 		c.collectSnapshotMetrics(v, ch, l)
 	}
+
+	if c.collectDisks {
+		c.collectDiskMetrics(v, ch, l)
+	}
 }
 
 func (c *VMCollector) collectCPUMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
@@ -192,4 +212,48 @@ func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric
 
 	max := s[len(s)-1]
 	ch <- metric.MustCreate(minSnapshotAge, time.Since(max.Date).Seconds(), l)
+}
+
+func (c *VMCollector) collectDiskMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
+	attchs := DiskAttachments{}
+	path := fmt.Sprintf("vms/%s/diskattachments", vm.ID)
+
+	err := c.client.GetAndParse(path, &attchs)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if len(attchs.Attachment) == 0 {
+		return
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(attchs.Attachment))
+
+	for _, a := range attchs.Attachment {
+		go c.collectForAttachment(a, ch, l, wg)
+	}
+
+	wg.Wait()
+}
+
+func (c *VMCollector) collectForAttachment(attachment DiskAttachment, ch chan<- prometheus.Metric, l []string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	d, err := disk.Get(attachment.Disk.ID, c.client)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if d == nil {
+		log.Error("could not find disk with ID " + attachment.Disk.ID)
+		return
+	}
+
+	l = append(l, d.Name, d.Alias, attachment.LogicalName, d.StorageDomainName())
+	ch <- metric.MustCreate(diskProvisionedSize, float64(d.ProvisionedSize), l)
+	ch <- metric.MustCreate(diskActualSize, float64(d.ActualSize), l)
+	ch <- metric.MustCreate(diskTotalSize, float64(d.TotalSize), l)
 }

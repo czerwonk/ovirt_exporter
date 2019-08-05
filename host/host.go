@@ -1,9 +1,11 @@
 package host
 
+// Hosts is a collection of Host
 type Hosts struct {
 	Hosts []Host `xml:"host"`
 }
 
+// Host represents the host resource
 type Host struct {
 	ID      string `xml:"id,attr"`
 	Name    string `xml:"name"`

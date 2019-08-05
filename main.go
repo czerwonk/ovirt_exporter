@@ -12,12 +12,13 @@ import (
 	"github.com/czerwonk/ovirt_exporter/host"
 	"github.com/czerwonk/ovirt_exporter/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/vm"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.8.6"
+const version string = "0.9.0"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -25,10 +26,12 @@ var (
 	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	apiURL          = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
 	apiUser         = flag.String("api.username", "user@internal", "API username")
+	apiPass         = flag.String("api.password", "", "API password")
 	apiPassFile     = flag.String("api.password-file", "", "File containing the API password")
 	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
 	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
 	withNetwork     = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
+	withDisks       = flag.Bool("with-disks", true, "Collect disk metrics (can be time consuming in some cases)")
 	debug           = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
 
 	collectorDuration = prometheus.NewHistogramVec(
@@ -112,13 +115,12 @@ func connectAPI() (*api.Client, error) {
 		opts = append(opts, api.WithInsecure())
 	}
 
-	b, err := ioutil.ReadFile(*apiPassFile)
+	pass, err := apiPassword()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error while reading password file")
 	}
-	apiPass := strings.Trim(string(b), "\n")
 
-	client, err := api.NewClient(*apiURL, *apiUser, apiPass, opts...)
+	client, err := api.NewClient(*apiURL, *apiUser, pass, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +128,22 @@ func connectAPI() (*api.Client, error) {
 	return client, err
 }
 
+func apiPassword() (string, error) {
+	if *apiPassFile == "" {
+		return *apiPass, nil
+	}
+
+	b, err := ioutil.ReadFile(*apiPassFile)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Trim(string(b), "\n"), nil
+}
+
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client, appReg *prometheus.Registry) {
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork, collectorDuration.WithLabelValues("vm")))
+	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork, *withDisks, collectorDuration.WithLabelValues("vm")))
 	reg.MustRegister(host.NewCollector(client, *withNetwork, collectorDuration.WithLabelValues("host")))
 	reg.MustRegister(storagedomain.NewCollector(client, collectorDuration.WithLabelValues("storage")))
 

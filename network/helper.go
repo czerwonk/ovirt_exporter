@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// CollectMetricsForHost collects net metrics for a specific Host
 func CollectMetricsForHost(path, prefix string, labelNames, labelValues []string, client *api.Client, ch chan<- prometheus.Metric) error {
 	nics := &HostNics{}
 	err := client.GetAndParse(path, nics)
@@ -20,6 +21,7 @@ func CollectMetricsForHost(path, prefix string, labelNames, labelValues []string
 	return collectForNics(nics.Nics, path, prefix, labelNames, labelValues, client, ch)
 }
 
+// CollectMetricsForVM collects net metrics for a specific VM
 func CollectMetricsForVM(path, prefix string, labelNames, labelValues []string, client *api.Client, ch chan<- prometheus.Metric) error {
 	nics := &VMNics{}
 	err := client.GetAndParse(path, nics)
