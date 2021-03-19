@@ -3,7 +3,7 @@ on:
     tags:
       - '*.*.*'
 
-name: Create Release
+name: Release 
 jobs:
   goreleaser:
     name: Create Release
