@@ -1,0 +1,23 @@
+dist: artifacts
+before:
+   hooks:
+     - go mod download
+builds:
+  - env:
+    - CGO_ENABLED=0
+    goos:
+    - linux
+    - darwin
+    - windows
+    - freebsd
+    goarch:
+    - amd64
+    - arm
+    - arm64
+    ldflags: -s -w -X main.version={{.Version}}
+    binary: ovirt_exporter 
+archive:
+  format: tar.gz
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+  replacements:
+    amd64: x86_64
