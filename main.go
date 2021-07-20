@@ -15,10 +15,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
-const version string = "0.9.0"
+const version string = "0.9.1"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -105,7 +105,7 @@ func startServer() {
 }
 
 func connectAPI() (*api.Client, error) {
-	opts := []api.ClientOption{api.WithLogger(&PromLogger{})}
+	opts := []api.ClientOption{api.WithLogger(log.StandardLogger())}
 
 	if *debug {
 		opts = append(opts, api.WithDebug())
@@ -152,8 +152,11 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Cl
 		appReg,
 	}
 
+	l := log.New()
+	l.Level = log.ErrorLevel
+
 	promhttp.HandlerFor(multiRegs, promhttp.HandlerOpts{
-		ErrorLog:      log.NewErrorLogger(),
+		ErrorLog:      l,
 		ErrorHandling: promhttp.ContinueOnError,
 		Registry:      appReg}).ServeHTTP(w, r)
 }

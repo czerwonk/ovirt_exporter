@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (

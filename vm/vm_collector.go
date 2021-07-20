@@ -15,7 +15,7 @@ import (
 	"github.com/czerwonk/ovirt_exporter/network"
 	"github.com/czerwonk/ovirt_exporter/statistic"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 const prefix = "ovirt_vm_"

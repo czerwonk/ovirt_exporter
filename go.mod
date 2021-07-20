@@ -3,8 +3,9 @@ module github.com/czerwonk/ovirt_exporter
 go 1.16
 
 require (
-	github.com/czerwonk/ovirt_api v0.0.0-20180321161247-63e3f014686c
-	github.com/pkg/errors v0.8.0
-	github.com/prometheus/client_golang v0.9.4
-	github.com/prometheus/common v0.4.1
+	github.com/czerwonk/ovirt_api v0.0.0-20190114183432-31037b874427
+	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/common v0.29.0
+	github.com/sirupsen/logrus v1.8.1
 )

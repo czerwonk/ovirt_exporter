@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -42,7 +42,7 @@ func Name(id string, client *api.Client) string {
 		return ""
 	}
 
-	if (d == nil) {
+	if d == nil {
 		log.Errorf("could not find name for storage domain with ID %s", id)
 		return ""
 	}

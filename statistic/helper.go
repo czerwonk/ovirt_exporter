@@ -6,7 +6,7 @@ import (
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // CollectMetrics collects metrics by statics returned by a given url
