@@ -2,7 +2,7 @@ on:
   push:
     branches: [ master ]
 
-name: Docker Build (tag)
+name: Docker Build (latest)
 jobs:
   build:
     runs-on: ubuntu-latest
