@@ -3,6 +3,7 @@ package host
 import (
 	"fmt"
 	"sync"
+	"regexp"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
@@ -27,7 +28,7 @@ var (
 
 func init() {
 	labelNames = []string{"name", "cluster"}
-	upDesc = prometheus.NewDesc(prefix+"up", "Host is running (1) or not (0)", labelNames, nil)
+	upDesc = prometheus.NewDesc(prefix+"up", "Host status is up (1) or not (0) or on maintenance (2)", labelNames, nil)
 	cpuCoresDesc = prometheus.NewDesc(prefix+"cpu_cores", "Number of CPU cores assigned", labelNames, nil)
 	cpuSocketsDesc = prometheus.NewDesc(prefix+"cpu_sockets", "Number of sockets", labelNames, nil)
 	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
@@ -135,11 +136,16 @@ func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues 
 	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
 }
 
-func (c *HostCollector) upMetric(h *Host, labelValues []string) prometheus.Metric {
-	var up float64
-	if h.Status == "up" {
-		up = 1
+func (c *HostCollector) upMetric(host *Host, labelValues []string) prometheus.Metric {
+	var re = regexp.MustCompile(`maintenance|installing`)
+	var status float64
+	host_status := host.Status
+
+	if host_status == "up" {
+		status = 1
+	} else if re.MatchString(host_status) {
+		status = 2
 	}
 
-	return metric.MustCreate(upDesc, up, labelValues)
+	return metric.MustCreate(upDesc, status, labelValues)
 }
