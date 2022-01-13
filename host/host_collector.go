@@ -2,8 +2,8 @@ package host
 
 import (
 	"fmt"
-	"sync"
 	"regexp"
+	"sync"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/cluster"
@@ -17,13 +17,14 @@ import (
 const prefix = "ovirt_host_"
 
 var (
-	upDesc         *prometheus.Desc
-	cpuCoresDesc   *prometheus.Desc
-	cpuSocketsDesc *prometheus.Desc
-	cpuThreadsDesc *prometheus.Desc
-	cpuSpeedDesc   *prometheus.Desc
-	memoryDesc     *prometheus.Desc
-	labelNames     []string
+	upDesc               *prometheus.Desc
+	cpuCoresDesc         *prometheus.Desc
+	cpuSocketsDesc       *prometheus.Desc
+	cpuThreadsDesc       *prometheus.Desc
+	cpuSpeedDesc         *prometheus.Desc
+	memoryDesc           *prometheus.Desc
+	labelNames           []string
+	hostMaintenanceRegex *regexp.Regexp
 )
 
 func init() {
@@ -34,6 +35,7 @@ func init() {
 	cpuThreadsDesc = prometheus.NewDesc(prefix+"cpu_threads", "Number of threads", labelNames, nil)
 	cpuSpeedDesc = prometheus.NewDesc(prefix+"cpu_speed_hertz", "CPU speed in hertz", labelNames, nil)
 	memoryDesc = prometheus.NewDesc(prefix+"memory_installed_bytes", "Memory installed in bytes", labelNames, nil)
+	hostMaintenanceRegex = regexp.MustCompile(`maintenance|installing`)
 }
 
 // HostCollector collects host statistics from oVirt
@@ -137,13 +139,12 @@ func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues 
 }
 
 func (c *HostCollector) upMetric(host *Host, labelValues []string) prometheus.Metric {
-	var re = regexp.MustCompile(`maintenance|installing`)
 	var status float64
 	host_status := host.Status
 
 	if host_status == "up" {
 		status = 1
-	} else if re.MatchString(host_status) {
+	} else if hostMaintenanceRegex.MatchString(host_status) {
 		status = 2
 	}
 
