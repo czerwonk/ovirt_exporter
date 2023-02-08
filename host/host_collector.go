@@ -134,10 +134,6 @@ func (c *HostCollector) collectCPUMetrics(host *Host, ch chan prometheus.Metric,
 	ch <- metric.MustCreate(cpuSpeedDesc, float64(host.CPU.Speed*1e6), l)
 }
 
-func (c *HostCollector) addMetric(desc *prometheus.Desc, v float64, labelValues []string) {
-	c.metrics = append(c.metrics, prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labelValues...))
-}
-
 func (c *HostCollector) upMetric(host *Host, labelValues []string) prometheus.Metric {
 	var status float64
 	host_status := host.Status

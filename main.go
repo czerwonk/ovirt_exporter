@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -14,11 +13,12 @@ import (
 	"github.com/czerwonk/ovirt_exporter/vm"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
-const version string = "0.9.2"
+const version string = "0.9.3"
 
 var (
 	showVersion     = flag.Bool("version", false, "Print version information.")
@@ -92,8 +92,8 @@ func startServer() {
 	defer client.Close()
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	reg.MustRegister(prometheus.NewGoCollector())
+	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	reg.MustRegister(collectors.NewGoCollector())
 	reg.MustRegister(collectorDuration)
 
 	http.HandleFunc(*metricsPath, func(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +133,7 @@ func apiPassword() (string, error) {
 		return *apiPass, nil
 	}
 
-	b, err := ioutil.ReadFile(*apiPassFile)
+	b, err := os.ReadFile(*apiPassFile)
 	if err != nil {
 		return "", err
 	}
