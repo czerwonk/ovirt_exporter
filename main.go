@@ -21,18 +21,21 @@ import (
 const version string = "0.9.3"
 
 var (
-	showVersion     = flag.Bool("version", false, "Print version information.")
-	listenAddress   = flag.String("web.listen-address", ":9325", "Address on which to expose metrics and web interface.")
-	metricsPath     = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	apiURL          = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
-	apiUser         = flag.String("api.username", "user@internal", "API username")
-	apiPass         = flag.String("api.password", "", "API password")
-	apiPassFile     = flag.String("api.password-file", "", "File containing the API password")
-	apiInsecureCert = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
-	withSnapshots   = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
-	withNetwork     = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
-	withDisks       = flag.Bool("with-disks", true, "Collect disk metrics (can be time consuming in some cases)")
-	debug           = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
+	showVersion      = flag.Bool("version", false, "Print version information.")
+	listenAddress    = flag.String("web.listen-address", ":9325", "Address on which to expose metrics and web interface.")
+	metricsPath      = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	apiURL           = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
+	apiUser          = flag.String("api.username", "user@internal", "API username")
+	apiPass          = flag.String("api.password", "", "API password")
+	apiPassFile      = flag.String("api.password-file", "", "File containing the API password")
+	apiInsecureCert  = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
+	withSnapshots    = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
+	withNetwork      = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
+	withDisks        = flag.Bool("with-disks", true, "Collect disk metrics (can be time consuming in some cases)")
+	debug            = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
+	tlsEnabled       = flag.Bool("tls.enabled", false, "Enables TLS")
+	tlsCertChainPath = flag.String("tls.cert-file", "", "Path to TLS cert file")
+	tlsKeyPath       = flag.String("tls.key-file", "", "Path to TLS key file")
 
 	collectorDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -100,7 +103,12 @@ func startServer() {
 		handleMetricsRequest(w, r, client, reg)
 	})
 
-	log.Infof("Listening for %s on %s", *metricsPath, *listenAddress)
+	log.Infof("Listening for %s on %s (TLS: %v)", *metricsPath, *listenAddress, *tlsEnabled)
+	if *tlsEnabled {
+		log.Fatal(http.ListenAndServeTLS(*listenAddress, *tlsCertChainPath, *tlsKeyPath, nil))
+		return
+	}
+
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
 
