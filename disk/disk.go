@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package disk
 
 import "github.com/czerwonk/ovirt_exporter/storagedomain"

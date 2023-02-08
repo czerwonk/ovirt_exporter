@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package vm
 
 // VMs is a collection of virtual machines

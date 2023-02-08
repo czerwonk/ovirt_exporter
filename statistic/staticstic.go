@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package statistic
 
 // Statistics is a collection of Statistics

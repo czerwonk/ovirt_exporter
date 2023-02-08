@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package vm
 
 import "github.com/czerwonk/ovirt_exporter/disk"

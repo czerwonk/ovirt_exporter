@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package host
 
 // Hosts is a collection of Host

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package network
 
 // HostNics is a collection of NICs of a host

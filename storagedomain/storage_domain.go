@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 package storagedomain
 
 // StorageDomains is a collection of storage domains
