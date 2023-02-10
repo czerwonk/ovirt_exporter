@@ -9,7 +9,7 @@ import (
 
 	"time"
 
-	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/client"
 	"github.com/czerwonk/ovirt_exporter/pkg/cluster"
 	"github.com/czerwonk/ovirt_exporter/pkg/disk"
 	"github.com/czerwonk/ovirt_exporter/pkg/host"
@@ -57,7 +57,7 @@ func init() {
 
 // VMCollector collects virtual machine statistics from oVirt
 type VMCollector struct {
-	client           *api.Client
+	cl               client.Client
 	collectDuration  prometheus.Observer
 	metrics          []prometheus.Metric
 	collectSnapshots bool
@@ -67,9 +67,9 @@ type VMCollector struct {
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool, collectDisks bool, collectDuration prometheus.Observer) prometheus.Collector {
+func NewCollector(cl client.Client, collectSnaphots, collectNetwork bool, collectDisks bool, collectDuration prometheus.Observer) prometheus.Collector {
 	return &VMCollector{
-		client:           client,
+		cl:               cl,
 		collectSnapshots: collectSnaphots,
 		collectNetwork:   collectNetwork,
 		collectDisks:     collectDisks,
@@ -107,7 +107,7 @@ func (c *VMCollector) retrieveMetrics() {
 	defer timer.ObserveDuration()
 
 	v := VMs{}
-	err := c.client.GetAndParse("vms", &v)
+	err := c.cl.GetAndParse("vms", &v)
 	if err != nil {
 		log.Error(err)
 		return
@@ -135,7 +135,7 @@ func (c *VMCollector) collectForVM(vm VM, ch chan<- prometheus.Metric, wg *sync.
 	defer wg.Done()
 
 	v := &vm
-	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.ID, c.client)}
+	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.ID, c.cl)}
 
 	ch <- c.upMetric(v, l)
 	ch <- c.diskImageIllegalMetric(v, l)
@@ -143,11 +143,11 @@ func (c *VMCollector) collectForVM(vm VM, ch chan<- prometheus.Metric, wg *sync.
 	c.collectCPUMetrics(v, ch, l)
 
 	statPath := fmt.Sprintf("vms/%s/statistics", vm.ID)
-	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
+	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.cl, ch)
 
 	if c.collectNetwork {
 		networkPath := fmt.Sprintf("vms/%s/nics", vm.ID)
-		network.CollectMetricsForVM(networkPath, prefix, labelNames, l, c.client, ch)
+		network.CollectMetricsForVM(networkPath, prefix, labelNames, l, c.cl, ch)
 	}
 
 	if c.collectSnapshots {
@@ -171,7 +171,7 @@ func (c *VMCollector) hostName(vm *VM) string {
 		return ""
 	}
 
-	return host.Name(vm.Host.ID, c.client)
+	return host.Name(vm.Host.ID, c.cl)
 }
 
 func (c *VMCollector) upMetric(vm *VM, labelValues []string) prometheus.Metric {
@@ -196,7 +196,7 @@ func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric
 	snaps := Snapshots{}
 	path := fmt.Sprintf("vms/%s/snapshots", vm.ID)
 
-	err := c.client.GetAndParse(path, &snaps)
+	err := c.cl.GetAndParse(path, &snaps)
 	if err != nil {
 		log.Error(err)
 		return
@@ -220,7 +220,7 @@ func (c *VMCollector) collectDiskMetrics(vm *VM, ch chan<- prometheus.Metric, l 
 	attchs := DiskAttachments{}
 	path := fmt.Sprintf("vms/%s/diskattachments", vm.ID)
 
-	err := c.client.GetAndParse(path, &attchs)
+	err := c.cl.GetAndParse(path, &attchs)
 	if err != nil {
 		log.Error(err)
 		return
@@ -243,7 +243,7 @@ func (c *VMCollector) collectDiskMetrics(vm *VM, ch chan<- prometheus.Metric, l 
 func (c *VMCollector) collectForAttachment(attachment DiskAttachment, ch chan<- prometheus.Metric, l []string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	d, err := disk.Get(attachment.Disk.ID, c.client)
+	d, err := disk.Get(attachment.Disk.ID, c.cl)
 	if err != nil {
 		log.Error(err)
 		return

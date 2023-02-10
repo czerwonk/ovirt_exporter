@@ -7,7 +7,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +17,11 @@ var (
 )
 
 // Get retrieves cluster information
-func Get(id string, client *api.Client) (*Cluster, error) {
+func Get(id string, cl client.Client) (*Cluster, error) {
 	path := fmt.Sprintf("clusters/%s", id)
 
 	c := Cluster{}
-	err := client.GetAndParse(path, &c)
+	err := cl.GetAndParse(path, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func Get(id string, client *api.Client) (*Cluster, error) {
 }
 
 // Name retrieves cluster name
-func Name(id string, client *api.Client) string {
+func Name(id string, cl client.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +38,7 @@ func Name(id string, client *api.Client) string {
 		return n
 	}
 
-	h, err := Get(id, client)
+	h, err := Get(id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""

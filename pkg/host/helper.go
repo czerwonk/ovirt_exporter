@@ -7,7 +7,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +17,11 @@ var (
 )
 
 // Get retrieves host information
-func Get(id string, client *api.Client) (*Host, error) {
+func Get(id string, cl client.Client) (*Host, error) {
 	path := fmt.Sprintf("hosts/%s", id)
 
 	h := Host{}
-	err := client.GetAndParse(path, &h)
+	err := cl.GetAndParse(path, &h)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func Get(id string, client *api.Client) (*Host, error) {
 }
 
 // Name retrieves host name
-func Name(id string, client *api.Client) string {
+func Name(id string, cl client.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +38,7 @@ func Name(id string, client *api.Client) string {
 		return n
 	}
 
-	h, err := Get(id, client)
+	h, err := Get(id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""

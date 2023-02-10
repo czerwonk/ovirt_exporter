@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/client"
 	"github.com/czerwonk/ovirt_exporter/pkg/cluster"
 	"github.com/czerwonk/ovirt_exporter/pkg/metric"
 	"github.com/czerwonk/ovirt_exporter/pkg/network"
@@ -42,7 +42,7 @@ func init() {
 
 // HostCollector collects host statistics from oVirt
 type HostCollector struct {
-	client          *api.Client
+	cl              client.Client
 	collectDuration prometheus.Observer
 	metrics         []prometheus.Metric
 	collectNetwork  bool
@@ -50,8 +50,8 @@ type HostCollector struct {
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectNetwork bool, collectDuration prometheus.Observer) prometheus.Collector {
-	return &HostCollector{client: client, collectNetwork: collectNetwork, collectDuration: collectDuration}
+func NewCollector(cl client.Client, collectNetwork bool, collectDuration prometheus.Observer) prometheus.Collector {
+	return &HostCollector{cl: cl, collectNetwork: collectNetwork, collectDuration: collectDuration}
 }
 
 // Collect implements Prometheus Collector interface
@@ -85,7 +85,7 @@ func (c *HostCollector) retrieveMetrics() {
 	defer timer.ObserveDuration()
 
 	h := Hosts{}
-	err := c.client.GetAndParse("hosts", &h)
+	err := c.cl.GetAndParse("hosts", &h)
 	if err != nil {
 		log.Error(err)
 		return
@@ -113,18 +113,18 @@ func (c *HostCollector) collectForHost(host Host, ch chan prometheus.Metric, wg 
 	defer wg.Done()
 
 	h := &host
-	l := []string{h.Name, cluster.Name(h.Cluster.ID, c.client)}
+	l := []string{h.Name, cluster.Name(h.Cluster.ID, c.cl)}
 
 	ch <- c.upMetric(h, l)
 	ch <- metric.MustCreate(memoryDesc, float64(host.Memory), l)
 	c.collectCPUMetrics(h, ch, l)
 
 	statPath := fmt.Sprintf("hosts/%s/statistics", host.ID)
-	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
+	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.cl, ch)
 
 	if c.collectNetwork {
 		networkPath := fmt.Sprintf("hosts/%s/nics", host.ID)
-		network.CollectMetricsForHost(networkPath, prefix, labelNames, l, c.client, ch)
+		network.CollectMetricsForHost(networkPath, prefix, labelNames, l, c.cl, ch)
 	}
 }
 

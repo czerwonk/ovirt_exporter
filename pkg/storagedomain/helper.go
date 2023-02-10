@@ -7,7 +7,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +17,11 @@ var (
 )
 
 // Get retrieves domain information
-func Get(id string, client *api.Client) (*StorageDomain, error) {
+func Get(id string, cl client.Client) (*StorageDomain, error) {
 	path := fmt.Sprintf("storagedomains/%s", id)
 
 	d := StorageDomain{}
-	err := client.GetAndParse(path, &d)
+	err := cl.GetAndParse(path, &d)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func Get(id string, client *api.Client) (*StorageDomain, error) {
 }
 
 // Name retrieves domain name
-func Name(id string, client *api.Client) string {
+func Name(id string, cl client.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +38,7 @@ func Name(id string, client *api.Client) string {
 		return n
 	}
 
-	d, err := Get(id, client)
+	d, err := Get(id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""
