@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/cluster"
-	"github.com/czerwonk/ovirt_exporter/metric"
-	"github.com/czerwonk/ovirt_exporter/network"
-	"github.com/czerwonk/ovirt_exporter/statistic"
+	"github.com/czerwonk/ovirt_exporter/pkg/cluster"
+	"github.com/czerwonk/ovirt_exporter/pkg/metric"
+	"github.com/czerwonk/ovirt_exporter/pkg/network"
+	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )

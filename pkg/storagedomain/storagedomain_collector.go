@@ -4,7 +4,7 @@ package storagedomain
 
 import (
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/metric"
+	"github.com/czerwonk/ovirt_exporter/pkg/metric"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )

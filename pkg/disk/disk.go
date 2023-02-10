@@ -2,7 +2,7 @@
 
 package disk
 
-import "github.com/czerwonk/ovirt_exporter/storagedomain"
+import "github.com/czerwonk/ovirt_exporter/pkg/storagedomain"
 
 // Disk represents the disk resource
 type Disk struct {

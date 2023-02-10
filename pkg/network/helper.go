@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/czerwonk/ovirt_exporter/statistic"
+	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/prometheus/client_golang/prometheus"

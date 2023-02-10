@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/storagedomain"
+	"github.com/czerwonk/ovirt_exporter/pkg/storagedomain"
 )
 
 // Get retrieves disk information
