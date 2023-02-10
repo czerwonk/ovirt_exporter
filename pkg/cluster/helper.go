@@ -3,11 +3,12 @@
 package cluster
 
 import (
+	"context"
 	"sync"
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/client"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +18,11 @@ var (
 )
 
 // Get retrieves cluster information
-func Get(id string, cl client.Client) (*Cluster, error) {
+func Get(ctx context.Context, id string, cl collector.Client) (*Cluster, error) {
 	path := fmt.Sprintf("clusters/%s", id)
 
 	c := Cluster{}
-	err := cl.GetAndParse(path, &c)
+	err := cl.GetAndParse(ctx, path, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func Get(id string, cl client.Client) (*Cluster, error) {
 }
 
 // Name retrieves cluster name
-func Name(id string, cl client.Client) string {
+func Name(ctx context.Context, id string, cl collector.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +39,7 @@ func Name(id string, cl client.Client) string {
 		return n
 	}
 
-	h, err := Get(id, cl)
+	h, err := Get(ctx, id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""

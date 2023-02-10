@@ -26,7 +26,7 @@ var (
 )
 
 func initTracing(ctx context.Context) (func(), error) {
-	if *tracingEnabled {
+	if !*tracingEnabled {
 		return initTracingWithNoop()
 	}
 

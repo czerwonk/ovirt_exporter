@@ -3,11 +3,12 @@
 package host
 
 import (
+	"context"
 	"sync"
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/client"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +18,11 @@ var (
 )
 
 // Get retrieves host information
-func Get(id string, cl client.Client) (*Host, error) {
+func Get(ctx context.Context, id string, cl collector.Client) (*Host, error) {
 	path := fmt.Sprintf("hosts/%s", id)
 
 	h := Host{}
-	err := cl.GetAndParse(path, &h)
+	err := cl.GetAndParse(ctx, path, &h)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func Get(id string, cl client.Client) (*Host, error) {
 }
 
 // Name retrieves host name
-func Name(id string, cl client.Client) string {
+func Name(ctx context.Context, id string, cl collector.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +39,7 @@ func Name(id string, cl client.Client) string {
 		return n
 	}
 
-	h, err := Get(id, cl)
+	h, err := Get(ctx, id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""

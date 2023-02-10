@@ -3,11 +3,12 @@
 package storagedomain
 
 import (
+	"context"
 	"sync"
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/client"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,11 +18,11 @@ var (
 )
 
 // Get retrieves domain information
-func Get(id string, cl client.Client) (*StorageDomain, error) {
+func Get(ctx context.Context, id string, cl collector.Client) (*StorageDomain, error) {
 	path := fmt.Sprintf("storagedomains/%s", id)
 
 	d := StorageDomain{}
-	err := cl.GetAndParse(path, &d)
+	err := cl.GetAndParse(ctx, path, &d)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func Get(id string, cl client.Client) (*StorageDomain, error) {
 }
 
 // Name retrieves domain name
-func Name(id string, cl client.Client) string {
+func Name(ctx context.Context, id string, cl collector.Client) string {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -38,7 +39,7 @@ func Name(id string, cl client.Client) string {
 		return n
 	}
 
-	d, err := Get(id, cl)
+	d, err := Get(ctx, id, cl)
 	if err != nil {
 		log.Error(err)
 		return ""

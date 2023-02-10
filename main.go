@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/czerwonk/ovirt_api/api"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	"github.com/czerwonk/ovirt_exporter/pkg/host"
 	"github.com/czerwonk/ovirt_exporter/pkg/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/pkg/vm"
@@ -166,13 +167,15 @@ func apiPassword() (string, error) {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client, appReg *prometheus.Registry) {
-	_, span := tracer.Start(context.Background(), "HandleMetricsRequest")
+	ctx, span := tracer.Start(context.Background(), "HandleMetricsRequest")
 	defer span.End()
 
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork, *withDisks, collectorDuration.WithLabelValues("vm")))
-	reg.MustRegister(host.NewCollector(client, *withNetwork, collectorDuration.WithLabelValues("host")))
-	reg.MustRegister(storagedomain.NewCollector(client, collectorDuration.WithLabelValues("storage")))
+
+	cc := collector.NewContext(tracer, client)
+	reg.MustRegister(vm.NewCollector(ctx, cc.Clone(), *withSnapshots, *withNetwork, *withDisks, collectorDuration.WithLabelValues("vm")))
+	reg.MustRegister(host.NewCollector(ctx, cc.Clone(), *withNetwork, collectorDuration.WithLabelValues("host")))
+	reg.MustRegister(storagedomain.NewCollector(ctx, cc.Clone(), collectorDuration.WithLabelValues("storage")))
 
 	multiRegs := prometheus.Gatherers{
 		reg,

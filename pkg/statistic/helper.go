@@ -3,18 +3,26 @@
 package statistic
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/client"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // CollectMetrics collects metrics by statics returned by a given url
-func CollectMetrics(path, prefix string, labelNames, labelValues []string, cl client.Client, ch chan<- prometheus.Metric) {
+func CollectMetrics(ctx context.Context, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) {
+	ctx, span := cc.Tracer().Start(ctx, "Statistic.CollectMetrics", trace.WithAttributes(
+		attribute.String("prefix", prefix),
+	))
+	defer span.End()
+
 	stats := Statistics{}
-	err := cl.GetAndParse(path, &stats)
+	err := cc.Client().GetAndParse(ctx, path, &stats)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -25,9 +33,9 @@ func CollectMetrics(path, prefix string, labelNames, labelValues []string, cl cl
 		}
 		switch s.Kind {
 		case "gauge":
-			ch <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.GaugeValue)
+			cc.MetricsCh() <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.GaugeValue)
 		case "counter":
-			ch <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.CounterValue)
+			cc.MetricsCh() <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.CounterValue)
 		}
 	}
 }
