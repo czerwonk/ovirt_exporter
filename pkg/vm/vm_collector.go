@@ -3,21 +3,24 @@
 package vm
 
 import (
+	"context"
 	"sync"
 
 	"fmt"
 
 	"time"
 
-	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/cluster"
-	"github.com/czerwonk/ovirt_exporter/disk"
-	"github.com/czerwonk/ovirt_exporter/host"
-	"github.com/czerwonk/ovirt_exporter/metric"
-	"github.com/czerwonk/ovirt_exporter/network"
-	"github.com/czerwonk/ovirt_exporter/statistic"
+	"github.com/czerwonk/ovirt_exporter/pkg/cluster"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/disk"
+	"github.com/czerwonk/ovirt_exporter/pkg/host"
+	"github.com/czerwonk/ovirt_exporter/pkg/metric"
+	"github.com/czerwonk/ovirt_exporter/pkg/network"
+	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const prefix = "ovirt_vm_"
@@ -57,40 +60,49 @@ func init() {
 
 // VMCollector collects virtual machine statistics from oVirt
 type VMCollector struct {
-	client           *api.Client
+	cc               *collector.CollectorContext
 	collectDuration  prometheus.Observer
 	metrics          []prometheus.Metric
 	collectSnapshots bool
 	collectNetwork   bool
 	collectDisks     bool
 	mutex            sync.Mutex
+	rootCtx          context.Context
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectSnaphots, collectNetwork bool, collectDisks bool, collectDuration prometheus.Observer) prometheus.Collector {
+func NewCollector(ctx context.Context, cc *collector.CollectorContext, collectSnaphots, collectNetwork bool, collectDisks bool, collectDuration prometheus.Observer) prometheus.Collector {
 	return &VMCollector{
-		client:           client,
+		cc:               cc,
 		collectSnapshots: collectSnaphots,
 		collectNetwork:   collectNetwork,
 		collectDisks:     collectDisks,
-		collectDuration:  collectDuration}
+		collectDuration:  collectDuration,
+		rootCtx:          ctx,
+	}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *VMCollector) Collect(ch chan<- prometheus.Metric) {
-	for _, m := range c.getMetrics() {
+	ctx, span := c.cc.Tracer().Start(c.rootCtx, "VMCollector.Collect")
+	defer span.End()
+
+	for _, m := range c.getMetrics(ctx) {
 		ch <- m
 	}
 }
 
 // Describe implements Prometheus Collector interface
 func (c *VMCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, m := range c.getMetrics() {
+	ctx, span := c.cc.Tracer().Start(c.rootCtx, "VMCollector.Describe")
+	defer span.End()
+
+	for _, m := range c.getMetrics(ctx) {
 		ch <- m.Desc()
 	}
 }
 
-func (c *VMCollector) getMetrics() []prometheus.Metric {
+func (c *VMCollector) getMetrics(ctx context.Context) []prometheus.Metric {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -98,16 +110,16 @@ func (c *VMCollector) getMetrics() []prometheus.Metric {
 		return c.metrics
 	}
 
-	c.retrieveMetrics()
+	c.retrieveMetrics(ctx)
 	return c.metrics
 }
 
-func (c *VMCollector) retrieveMetrics() {
+func (c *VMCollector) retrieveMetrics(ctx context.Context) {
 	timer := prometheus.NewTimer(c.collectDuration)
 	defer timer.ObserveDuration()
 
 	v := VMs{}
-	err := c.client.GetAndParse("vms", &v)
+	err := c.cc.Client().GetAndParse(ctx, "vms", &v)
 	if err != nil {
 		log.Error(err)
 		return
@@ -117,8 +129,9 @@ func (c *VMCollector) retrieveMetrics() {
 	wg.Add(len(v.VMs))
 
 	ch := make(chan prometheus.Metric)
+	c.cc.SetMetricsCh(ch)
 	for _, v := range v.VMs {
-		go c.collectForVM(v, ch, wg)
+		go c.collectForVM(ctx, v, wg)
 	}
 
 	go func() {
@@ -131,47 +144,56 @@ func (c *VMCollector) retrieveMetrics() {
 	}
 }
 
-func (c *VMCollector) collectForVM(vm VM, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c *VMCollector) collectForVM(ctx context.Context, vm VM, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	v := &vm
-	l := []string{v.Name, c.hostName(v), cluster.Name(v.Cluster.ID, c.client)}
+	ctx, span := c.cc.Tracer().Start(ctx, "VMCollector.CollectForVM", trace.WithAttributes(
+		attribute.String("vm_name", vm.Name),
+		attribute.String("vm_id", vm.ID),
+	))
+	defer span.End()
 
+	v := &vm
+	l := []string{v.Name, c.hostName(ctx, v), cluster.Name(ctx, v.Cluster.ID, c.cc.Client())}
+
+	ch := c.cc.MetricsCh()
 	ch <- c.upMetric(v, l)
 	ch <- c.diskImageIllegalMetric(v, l)
 
-	c.collectCPUMetrics(v, ch, l)
+	c.collectCPUMetrics(v, l)
 
 	statPath := fmt.Sprintf("vms/%s/statistics", vm.ID)
-	statistic.CollectMetrics(statPath, prefix, labelNames, l, c.client, ch)
+	statistic.CollectMetrics(ctx, statPath, prefix, labelNames, l, c.cc)
 
 	if c.collectNetwork {
 		networkPath := fmt.Sprintf("vms/%s/nics", vm.ID)
-		network.CollectMetricsForVM(networkPath, prefix, labelNames, l, c.client, ch)
+		network.CollectMetricsForVM(ctx, networkPath, prefix, labelNames, l, c.cc)
 	}
 
 	if c.collectSnapshots {
-		c.collectSnapshotMetrics(v, ch, l)
+		c.collectSnapshotMetrics(ctx, v, l)
 	}
 
 	if c.collectDisks {
-		c.collectDiskMetrics(v, ch, l)
+		c.collectDiskMetrics(ctx, v, l)
 	}
 }
 
-func (c *VMCollector) collectCPUMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
+func (c *VMCollector) collectCPUMetrics(vm *VM, l []string) {
 	topo := vm.CPU.Topology
+
+	ch := c.cc.MetricsCh()
 	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l)
 	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l)
 	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l)
 }
 
-func (c *VMCollector) hostName(vm *VM) string {
+func (c *VMCollector) hostName(ctx context.Context, vm *VM) string {
 	if len(vm.Host.ID) == 0 {
 		return ""
 	}
 
-	return host.Name(vm.Host.ID, c.client)
+	return host.Name(ctx, vm.Host.ID, c.cc.Client())
 }
 
 func (c *VMCollector) upMetric(vm *VM, labelValues []string) prometheus.Metric {
@@ -192,15 +214,20 @@ func (c *VMCollector) diskImageIllegalMetric(vm *VM, labelValues []string) prome
 	return metric.MustCreate(illegalImages, hasIllegalImages, labelValues)
 }
 
-func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
+func (c *VMCollector) collectSnapshotMetrics(ctx context.Context, vm *VM, l []string) {
+	ctx, span := c.cc.Tracer().Start(ctx, "VMCollector.CollectSnapshotMetrics")
+	defer span.End()
+
 	snaps := Snapshots{}
 	path := fmt.Sprintf("vms/%s/snapshots", vm.ID)
 
-	err := c.client.GetAndParse(path, &snaps)
+	err := c.cc.Client().GetAndParse(ctx, path, &snaps)
 	if err != nil {
 		log.Error(err)
 		return
 	}
+
+	ch := c.cc.MetricsCh()
 
 	s := snaps.Snapshot[1:]
 	ch <- metric.MustCreate(snapshotCount, float64(len(s)), l)
@@ -216,11 +243,14 @@ func (c *VMCollector) collectSnapshotMetrics(vm *VM, ch chan<- prometheus.Metric
 	ch <- metric.MustCreate(minSnapshotAge, time.Since(max.Date).Seconds(), l)
 }
 
-func (c *VMCollector) collectDiskMetrics(vm *VM, ch chan<- prometheus.Metric, l []string) {
+func (c *VMCollector) collectDiskMetrics(ctx context.Context, vm *VM, l []string) {
+	ctx, span := c.cc.Tracer().Start(ctx, "VMCollector.CollectDiskMetrics")
+	defer span.End()
+
 	attchs := DiskAttachments{}
 	path := fmt.Sprintf("vms/%s/diskattachments", vm.ID)
 
-	err := c.client.GetAndParse(path, &attchs)
+	err := c.cc.Client().GetAndParse(ctx, path, &attchs)
 	if err != nil {
 		log.Error(err)
 		return
@@ -234,16 +264,16 @@ func (c *VMCollector) collectDiskMetrics(vm *VM, ch chan<- prometheus.Metric, l 
 	wg.Add(len(attchs.Attachment))
 
 	for _, a := range attchs.Attachment {
-		go c.collectForAttachment(a, ch, l, wg)
+		go c.collectForAttachment(ctx, a, l, wg)
 	}
 
 	wg.Wait()
 }
 
-func (c *VMCollector) collectForAttachment(attachment DiskAttachment, ch chan<- prometheus.Metric, l []string, wg *sync.WaitGroup) {
+func (c *VMCollector) collectForAttachment(ctx context.Context, attachment DiskAttachment, l []string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	d, err := disk.Get(attachment.Disk.ID, c.client)
+	d, err := disk.Get(ctx, attachment.Disk.ID, c.cc.Client())
 	if err != nil {
 		log.Error(err)
 		return
@@ -255,6 +285,8 @@ func (c *VMCollector) collectForAttachment(attachment DiskAttachment, ch chan<- 
 	}
 
 	l = append(l, d.Name, d.Alias, attachment.LogicalName, d.StorageDomainName())
+
+	ch := c.cc.MetricsCh()
 	ch <- metric.MustCreate(diskProvisionedSize, float64(d.ProvisionedSize), l)
 	ch <- metric.MustCreate(diskActualSize, float64(d.ActualSize), l)
 	ch <- metric.MustCreate(diskTotalSize, float64(d.TotalSize), l)

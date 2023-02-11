@@ -3,8 +3,10 @@
 package storagedomain
 
 import (
-	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/metric"
+	"context"
+
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/metric"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,29 +32,39 @@ func init() {
 
 // StorageDomainCollector collects storage domain statistics from oVirt
 type StorageDomainCollector struct {
-	client          *api.Client
+	cc              *collector.CollectorContext
 	collectDuration prometheus.Observer
+	rootCtx         context.Context
 }
 
 // NewCollector creates a new collector
-func NewCollector(client *api.Client, collectDuration prometheus.Observer) prometheus.Collector {
-	return &StorageDomainCollector{client: client, collectDuration: collectDuration}
+func NewCollector(ctx context.Context, cc *collector.CollectorContext, collectDuration prometheus.Observer) prometheus.Collector {
+	return &StorageDomainCollector{
+		rootCtx:         ctx,
+		cc:              cc,
+		collectDuration: collectDuration,
+	}
 }
 
 // Collect implements Prometheus Collector interface
 func (c *StorageDomainCollector) Collect(ch chan<- prometheus.Metric) {
+	ctx, span := c.cc.Tracer().Start(c.rootCtx, "StorageDomainCollector.Collect")
+	defer span.End()
+
+	c.cc.SetMetricsCh(ch)
+
 	timer := prometheus.NewTimer(c.collectDuration)
 	defer timer.ObserveDuration()
 
 	s := StorageDomains{}
-	err := c.client.GetAndParse("storagedomains", &s)
+	err := c.cc.Client().GetAndParse(ctx, "storagedomains", &s)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 
 	for _, h := range s.Domains {
-		c.collectMetricsForDomain(h, ch)
+		c.collectMetricsForDomain(h)
 	}
 }
 
@@ -65,9 +77,11 @@ func (c *StorageDomainCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- committedDesc
 }
 
-func (c *StorageDomainCollector) collectMetricsForDomain(domain StorageDomain, ch chan<- prometheus.Metric) {
+func (c *StorageDomainCollector) collectMetricsForDomain(domain StorageDomain) {
 	d := &domain
 	l := []string{d.Name, string(d.Type), d.Storage.Path}
+
+	ch := c.cc.MetricsCh()
 
 	up := d.ExternalStatus == "ok"
 	ch <- metric.MustCreate(upDesc, boolToFloat(up), l)

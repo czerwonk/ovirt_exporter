@@ -3,16 +3,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/host"
-	"github.com/czerwonk/ovirt_exporter/storagedomain"
-	"github.com/czerwonk/ovirt_exporter/vm"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/host"
+	"github.com/czerwonk/ovirt_exporter/pkg/storagedomain"
+	"github.com/czerwonk/ovirt_exporter/pkg/vm"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -20,24 +23,27 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const version string = "0.9.3"
+const version string = "0.10.0"
 
 var (
-	showVersion      = flag.Bool("version", false, "Print version information.")
-	listenAddress    = flag.String("web.listen-address", ":9325", "Address on which to expose metrics and web interface.")
-	metricsPath      = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	apiURL           = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
-	apiUser          = flag.String("api.username", "user@internal", "API username")
-	apiPass          = flag.String("api.password", "", "API password")
-	apiPassFile      = flag.String("api.password-file", "", "File containing the API password")
-	apiInsecureCert  = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
-	withSnapshots    = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
-	withNetwork      = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
-	withDisks        = flag.Bool("with-disks", true, "Collect disk metrics (can be time consuming in some cases)")
-	debug            = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
-	tlsEnabled       = flag.Bool("tls.enabled", false, "Enables TLS")
-	tlsCertChainPath = flag.String("tls.cert-file", "", "Path to TLS cert file")
-	tlsKeyPath       = flag.String("tls.key-file", "", "Path to TLS key file")
+	showVersion              = flag.Bool("version", false, "Print version information.")
+	listenAddress            = flag.String("web.listen-address", ":9325", "Address on which to expose metrics and web interface.")
+	metricsPath              = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	apiURL                   = flag.String("api.url", "https://localhost/ovirt-engine/api/", "API REST Endpoint")
+	apiUser                  = flag.String("api.username", "user@internal", "API username")
+	apiPass                  = flag.String("api.password", "", "API password")
+	apiPassFile              = flag.String("api.password-file", "", "File containing the API password")
+	apiInsecureCert          = flag.Bool("api.insecure-cert", false, "Skip verification for untrusted SSL/TLS certificates")
+	withSnapshots            = flag.Bool("with-snapshots", true, "Collect snapshot metrics (can be time consuming in some cases)")
+	withNetwork              = flag.Bool("with-network", true, "Collect network metrics (can be time consuming in some cases)")
+	withDisks                = flag.Bool("with-disks", true, "Collect disk metrics (can be time consuming in some cases)")
+	debug                    = flag.Bool("debug", false, "Show verbose output (e.g. body of each response received from API)")
+	tlsEnabled               = flag.Bool("tls.enabled", false, "Enables TLS")
+	tlsCertChainPath         = flag.String("tls.cert-file", "", "Path to TLS cert file")
+	tlsKeyPath               = flag.String("tls.key-file", "", "Path to TLS key file")
+	tracingEnabled           = flag.Bool("tracing.enabled", false, "Enables tracing using OpenTelemetry")
+	tracingProvider          = flag.String("tracing.provider", "", "Sets the tracing provider (stdout or collector)")
+	tracingCollectorEndpoint = flag.String("tracing.collector.grpc-endpoint", "", "Sets the tracing provider (stdout or collector)")
 
 	collectorDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -64,6 +70,15 @@ func main() {
 		printVersion()
 		os.Exit(0)
 	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	shutdownTracing, err := initTracing(ctx)
+	if err != nil {
+		log.Fatalf("could not initialize tracing: %v", err)
+	}
+	defer shutdownTracing()
 
 	startServer()
 }
@@ -152,10 +167,15 @@ func apiPassword() (string, error) {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client, appReg *prometheus.Registry) {
+	ctx, span := tracer.Start(context.Background(), "HandleMetricsRequest")
+	defer span.End()
+
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(vm.NewCollector(client, *withSnapshots, *withNetwork, *withDisks, collectorDuration.WithLabelValues("vm")))
-	reg.MustRegister(host.NewCollector(client, *withNetwork, collectorDuration.WithLabelValues("host")))
-	reg.MustRegister(storagedomain.NewCollector(client, collectorDuration.WithLabelValues("storage")))
+
+	cc := collector.NewContext(tracer, client)
+	reg.MustRegister(vm.NewCollector(ctx, cc.Clone(), *withSnapshots, *withNetwork, *withDisks, collectorDuration.WithLabelValues("vm")))
+	reg.MustRegister(host.NewCollector(ctx, cc.Clone(), *withNetwork, collectorDuration.WithLabelValues("host")))
+	reg.MustRegister(storagedomain.NewCollector(ctx, cc.Clone(), collectorDuration.WithLabelValues("storage")))
 
 	multiRegs := prometheus.Gatherers{
 		reg,

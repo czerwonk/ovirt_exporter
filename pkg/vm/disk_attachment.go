@@ -2,7 +2,7 @@
 
 package vm
 
-import "github.com/czerwonk/ovirt_exporter/disk"
+import "github.com/czerwonk/ovirt_exporter/pkg/disk"
 
 // DiskAttachments is a collection of diskattachments
 type DiskAttachments struct {
