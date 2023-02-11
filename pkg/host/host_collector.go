@@ -14,7 +14,6 @@ import (
 	"github.com/czerwonk/ovirt_exporter/pkg/network"
 	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -67,7 +66,7 @@ func (c *HostCollector) Collect(ch chan<- prometheus.Metric) {
 	ctx, span := c.cc.Tracer().Start(c.rootCtx, "HostCollector.Collect")
 	defer span.End()
 
-	for _, m := range c.getMetrics(ctx) {
+	for _, m := range c.getMetrics(ctx, span) {
 		ch <- m
 	}
 }
@@ -77,12 +76,12 @@ func (c *HostCollector) Describe(ch chan<- *prometheus.Desc) {
 	ctx, span := c.cc.Tracer().Start(c.rootCtx, "HostCollector.Describe")
 	defer span.End()
 
-	for _, m := range c.getMetrics(ctx) {
+	for _, m := range c.getMetrics(ctx, span) {
 		ch <- m.Desc()
 	}
 }
 
-func (c *HostCollector) getMetrics(ctx context.Context) []prometheus.Metric {
+func (c *HostCollector) getMetrics(ctx context.Context, span trace.Span) []prometheus.Metric {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -90,18 +89,18 @@ func (c *HostCollector) getMetrics(ctx context.Context) []prometheus.Metric {
 		return c.metrics
 	}
 
-	c.retrieveMetrics(ctx)
+	c.retrieveMetrics(ctx, span)
 	return c.metrics
 }
 
-func (c *HostCollector) retrieveMetrics(ctx context.Context) {
+func (c *HostCollector) retrieveMetrics(ctx context.Context, span trace.Span) {
 	timer := prometheus.NewTimer(c.collectDuration)
 	defer timer.ObserveDuration()
 
 	h := Hosts{}
 	err := c.cc.Client().GetAndParse(ctx, "hosts", &h)
 	if err != nil {
-		log.Error(err)
+		c.cc.HandleError(err, span)
 		return
 	}
 
@@ -136,9 +135,10 @@ func (c *HostCollector) collectForHost(ctx context.Context, host Host, wg *sync.
 	h := &host
 	l := []string{h.Name, cluster.Name(ctx, h.Cluster.ID, c.cc.Client())}
 
-	ch := c.cc.MetricsCh()
-	ch <- c.upMetric(h, l)
-	ch <- metric.MustCreate(memoryDesc, float64(host.Memory), l)
+	c.cc.RecordMetrics(
+		c.upMetric(h, l),
+		metric.MustCreate(memoryDesc, float64(host.Memory), l),
+	)
 	c.collectCPUMetrics(h, l)
 
 	statPath := fmt.Sprintf("hosts/%s/statistics", host.ID)
@@ -153,11 +153,12 @@ func (c *HostCollector) collectForHost(ctx context.Context, host Host, wg *sync.
 func (c *HostCollector) collectCPUMetrics(host *Host, l []string) {
 	topo := host.CPU.Topology
 
-	ch := c.cc.MetricsCh()
-	ch <- metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l)
-	ch <- metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l)
-	ch <- metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l)
-	ch <- metric.MustCreate(cpuSpeedDesc, float64(host.CPU.Speed*1e6), l)
+	c.cc.RecordMetrics(
+		metric.MustCreate(cpuCoresDesc, float64(topo.Cores), l),
+		metric.MustCreate(cpuThreadsDesc, float64(topo.Threads), l),
+		metric.MustCreate(cpuSocketsDesc, float64(topo.Sockets), l),
+		metric.MustCreate(cpuSpeedDesc, float64(host.CPU.Speed*1e6), l),
+	)
 }
 
 func (c *HostCollector) upMetric(host *Host, labelValues []string) prometheus.Metric {

@@ -9,7 +9,6 @@ import (
 
 	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -24,7 +23,7 @@ func CollectMetrics(ctx context.Context, path, prefix string, labelNames, labelV
 	stats := Statistics{}
 	err := cc.Client().GetAndParse(ctx, path, &stats)
 	if err != nil {
-		log.Errorln(err)
+		cc.HandleError(err, span)
 	}
 
 	for _, s := range stats.Statistic {
@@ -33,9 +32,9 @@ func CollectMetrics(ctx context.Context, path, prefix string, labelNames, labelV
 		}
 		switch s.Kind {
 		case "gauge":
-			cc.MetricsCh() <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.GaugeValue)
+			cc.RecordMetrics(convertToMetric(s, prefix, labelNames, labelValues, prometheus.GaugeValue))
 		case "counter":
-			cc.MetricsCh() <- convertToMetric(s, prefix, labelNames, labelValues, prometheus.CounterValue)
+			cc.RecordMetrics(convertToMetric(s, prefix, labelNames, labelValues, prometheus.CounterValue))
 		}
 	}
 }
