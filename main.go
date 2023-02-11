@@ -167,7 +167,7 @@ func apiPassword() (string, error) {
 }
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Client, appReg *prometheus.Registry) {
-	ctx, span := tracer.Start(context.Background(), "HandleMetricsRequest")
+	ctx, span := tracer.Start(r.Context(), "HandleMetricsRequest")
 	defer span.End()
 
 	reg := prometheus.NewRegistry()
