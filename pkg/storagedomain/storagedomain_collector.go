@@ -5,7 +5,7 @@ package storagedomain
 import (
 	"context"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector"
 	"github.com/czerwonk/ovirt_exporter/pkg/metric"
 	"github.com/prometheus/client_golang/prometheus"
 )

@@ -8,7 +8,7 @@ import (
 
 	"fmt"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector"
 	log "github.com/sirupsen/logrus"
 )
 

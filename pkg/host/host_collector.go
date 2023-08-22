@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/czerwonk/ovirt_exporter/pkg/cluster"
-	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector"
 	"github.com/czerwonk/ovirt_exporter/pkg/metric"
 	"github.com/czerwonk/ovirt_exporter/pkg/network"
 	"github.com/czerwonk/ovirt_exporter/pkg/statistic"

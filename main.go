@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/czerwonk/ovirt_api/api"
-	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector"
 	"github.com/czerwonk/ovirt_exporter/pkg/host"
 	"github.com/czerwonk/ovirt_exporter/pkg/storagedomain"
 	"github.com/czerwonk/ovirt_exporter/pkg/vm"

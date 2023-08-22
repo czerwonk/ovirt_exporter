@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/czerwonk/ovirt_exporter/pkg/collector.go"
+	"github.com/czerwonk/ovirt_exporter/pkg/collector"
 	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
