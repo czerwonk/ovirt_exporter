@@ -23,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const version string = "0.10.0"
+const version string = "0.10.1"
 
 var (
 	showVersion              = flag.Bool("version", false, "Print version information.")
@@ -93,7 +93,7 @@ func printVersion() {
 func startServer() {
 	log.Infof("Starting oVirt exporter (Version: %s)", version)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
 			<body>

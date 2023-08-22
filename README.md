@@ -1,5 +1,4 @@
 # ovirt_exporter
-[![Docker Build Status](https://img.shields.io/docker/cloud/build/czerwonk/ovirt_exporter.svg)](https://hub.docker.com/r/czerwonk/ovirt_exporter/builds)
 [![Go Report Card](https://goreportcard.com/badge/github.com/czerwonk/ovirt_exporter)](https://goreportcard.com/report/github.com/czerwonk/ovirt_exporter)
 
 Exporter for oVirt engine metrics to use with https://prometheus.io/

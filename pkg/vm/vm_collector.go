@@ -50,7 +50,7 @@ func init() {
 	minSnapshotAge = prometheus.NewDesc(prefix+"snapshot_min_age_seconds", "Age of the newest snapshot in seconds", labelNames, nil)
 	illegalImages = prometheus.NewDesc(prefix+"illegal_images", "Health status of the disks attatched to the VM (1 if one or more disk is in illegal state)", labelNames, nil)
 
-	diskLabelNames := append(labelNames, "disk_name", "disk_alias", "disk_logical_name", "storage_domain")
+	diskLabelNames := append(labelNames, "disk_name", "disk_alias", "disk_logical_name", "storage_domain", "disk_id")
 	diskProvisionedSize = prometheus.NewDesc(prefix+"disk_provisioned_size_bytes", "Provisioned size of the disk in bytes", diskLabelNames, nil)
 	diskActualSize = prometheus.NewDesc(prefix+"disk_actual_size_bytes", "Actual size of the disk in bytes", diskLabelNames, nil)
 	diskTotalSize = prometheus.NewDesc(prefix+"disk_total_size_bytes", "Total size of the disk in bytes", diskLabelNames, nil)
@@ -289,7 +289,7 @@ func (c *VMCollector) collectForAttachment(ctx context.Context, attachment DiskA
 		return
 	}
 
-	l = append(l, d.Name, d.Alias, attachment.LogicalName, d.StorageDomainName())
+	l = append(l, d.Name, d.Alias, attachment.LogicalName, d.StorageDomainName(), attachment.Disk.ID)
 
 	c.cc.RecordMetrics(
 		metric.MustCreate(diskProvisionedSize, float64(d.ProvisionedSize), l),
