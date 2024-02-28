@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/czerwonk/ovirt_api v0.0.0-20190114183432-31037b874427
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.18.0
+	github.com/prometheus/client_golang v1.19.0
 	github.com/sirupsen/logrus v1.9.3
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0
@@ -24,9 +24,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
-	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
-	github.com/prometheus/common v0.45.0 // indirect
+	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
