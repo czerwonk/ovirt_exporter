@@ -1,9 +1,9 @@
 # ovirt_exporter
 [![Go Report Card](https://goreportcard.com/badge/github.com/czerwonk/ovirt_exporter)](https://goreportcard.com/report/github.com/czerwonk/ovirt_exporter)
 
-This project is in maintenance mode now. No new features will be implemented by myself, merge requests are welcome.
-
 Exporter for oVirt engine metrics to use with https://prometheus.io/
+
+This project is in maintenance mode now. No new features will be implemented by myself, merge requests are welcome.
 
 ## Install
 ```
