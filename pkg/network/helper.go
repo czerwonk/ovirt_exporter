@@ -3,6 +3,7 @@
 package network
 
 import (
+	context0 "context"
 	"fmt"
 	"sync"
 
@@ -10,11 +11,10 @@ import (
 	"github.com/czerwonk/ovirt_exporter/pkg/statistic"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/net/context"
 )
 
 // CollectMetricsForHost collects net metrics for a specific Host
-func CollectMetricsForHost(ctx context.Context, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
+func CollectMetricsForHost(ctx context0.Context, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
 	ctx, span := cc.Tracer().Start(ctx, "Network.CollectForHost", trace.WithAttributes(
 		attribute.String("prefix", prefix),
 	))
@@ -30,7 +30,7 @@ func CollectMetricsForHost(ctx context.Context, path, prefix string, labelNames,
 }
 
 // CollectMetricsForVM collects net metrics for a specific VM
-func CollectMetricsForVM(ctx context.Context, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
+func CollectMetricsForVM(ctx context0.Context, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
 	ctx, span := cc.Tracer().Start(ctx, "Network.CollectForVM", trace.WithAttributes(
 		attribute.String("prefix", prefix),
 	))
@@ -45,7 +45,7 @@ func CollectMetricsForVM(ctx context.Context, path, prefix string, labelNames, l
 	return collectForNICs(ctx, nics.Nics, path, prefix, labelNames, labelValues, cc)
 }
 
-func collectForNICs(ctx context.Context, nics []Nic, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
+func collectForNICs(ctx context0.Context, nics []Nic, path, prefix string, labelNames, labelValues []string, cc *collector.CollectorContext) error {
 	wg := sync.WaitGroup{}
 	wg.Add(len(nics))
 	for _, n := range nics {

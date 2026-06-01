@@ -17,7 +17,7 @@ type clientTracingAdapter struct {
 }
 
 // GetAndParse implements Client.GetAndParse
-func (cta *clientTracingAdapter) GetAndParse(ctx context.Context, path string, v interface{}) error {
+func (cta *clientTracingAdapter) GetAndParse(ctx context.Context, path string, v any) error {
 	_, span := cta.tracer.Start(ctx, "Client.RunCommandAndParseWithParser", trace.WithAttributes(
 		attribute.String("path", path),
 	))
