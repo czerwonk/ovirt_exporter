@@ -40,7 +40,7 @@ func CollectMetrics(ctx context.Context, path, prefix string, labelNames, labelV
 }
 
 func convertToMetric(s Statistic, prefix string, labelNames, labelValues []string, valueType prometheus.ValueType) prometheus.Metric {
-	metricName := strings.Replace(s.Name, ".", "_", -1)
+	metricName := strings.ReplaceAll(s.Name, ".", "_")
 
 	if s.Unit != "none" {
 		metricName += "_" + s.Unit

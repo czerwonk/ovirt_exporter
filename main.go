@@ -94,7 +94,7 @@ func startServer() {
 	log.Infof("Starting oVirt exporter (Version: %s)", version)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte(`<html>
+		_, _ = w.Write([]byte(`<html>
 			<head><title>oVirt Exporter (Version ` + version + `)</title></head>
 			<body>
 			<h1>oVirt Exporter</h1>

@@ -146,7 +146,9 @@ func (c *HostCollector) collectForHost(ctx context.Context, host Host, wg *sync.
 
 	if c.collectNetwork {
 		networkPath := fmt.Sprintf("hosts/%s/nics", host.ID)
-		network.CollectMetricsForHost(ctx, networkPath, prefix, labelNames, l, c.cc)
+		if err := network.CollectMetricsForHost(ctx, networkPath, prefix, labelNames, l, c.cc); err != nil {
+			c.cc.HandleError(err, span)
+		}
 	}
 }
 

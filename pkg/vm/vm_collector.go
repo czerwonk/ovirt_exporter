@@ -167,7 +167,9 @@ func (c *VMCollector) collectForVM(ctx context.Context, vm VM, wg *sync.WaitGrou
 
 	if c.collectNetwork {
 		networkPath := fmt.Sprintf("vms/%s/nics", vm.ID)
-		network.CollectMetricsForVM(ctx, networkPath, prefix, labelNames, l, c.cc)
+		if err := network.CollectMetricsForVM(ctx, networkPath, prefix, labelNames, l, c.cc); err != nil {
+			c.cc.HandleError(err, span)
+		}
 	}
 
 	if c.collectSnapshots {
