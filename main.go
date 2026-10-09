@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/czerwonk/ovirt_api/api"
 	"github.com/czerwonk/ovirt_exporter/pkg/collector"
@@ -120,13 +121,19 @@ func startServer() {
 		handleMetricsRequest(w, r, client, reg)
 	})
 
+	// No WriteTimeout: collecting metrics from large oVirt environments can take a long time
+	srv := &http.Server{
+		Addr:              *listenAddress,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
 	log.Infof("Listening for %s on %s (TLS: %v)", *metricsPath, *listenAddress, *tlsEnabled)
 	if *tlsEnabled {
-		log.Fatal(http.ListenAndServeTLS(*listenAddress, *tlsCertChainPath, *tlsKeyPath, nil))
+		log.Fatal(srv.ListenAndServeTLS(*tlsCertChainPath, *tlsKeyPath))
 		return
 	}
 
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	log.Fatal(srv.ListenAndServe())
 }
 
 func connectAPI() (*api.Client, error) {
