@@ -1,6 +1,6 @@
 module github.com/czerwonk/ovirt_exporter
 
-go 1.27.2
+go 1.26.9
 
 require (
 	github.com/czerwonk/ovirt_api v0.0.0-20190114183432-31037b874427
