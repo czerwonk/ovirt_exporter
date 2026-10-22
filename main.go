@@ -24,7 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const version string = "0.10.2"
+const version string = "0.10.3"
 
 var (
 	showVersion              = flag.Bool("version", false, "Print version information.")
@@ -195,5 +195,6 @@ func handleMetricsRequest(w http.ResponseWriter, r *http.Request, client *api.Cl
 	promhttp.HandlerFor(multiRegs, promhttp.HandlerOpts{
 		ErrorLog:      l,
 		ErrorHandling: promhttp.ContinueOnError,
-		Registry:      appReg}).ServeHTTP(w, r)
+		Registry:      appReg,
+	}).ServeHTTP(w, r)
 }
